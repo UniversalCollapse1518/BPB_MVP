@@ -7,18 +7,22 @@ SCREEN_HEIGHT = 600
 GRID_SIZE = 50
 GRID_COLOR = (200, 200, 200)
 BG_COLOR = (255, 255, 255)
+FONT_COLOR = (10, 10, 10)
 
 # Backpack dimensions (e.g., 5x5 grid)
 BACKPACK_COLS = 5
 BACKPACK_ROWS = 5
 
-# --- Item Class ---
+# --- Item Class (UPDATED) ---
 class Item(pygame.sprite.Sprite):
-    """A simple class for a draggable item."""
-    def __init__(self, color, width, height, x, y, name="Item"):
+    """A class for a draggable item with stats."""
+    def __init__(self, color, width, height, x, y, name="Item", damage=0, cooldown=0.0):
         super().__init__()
         self.color = color
         self.name = name
+        self.damage = damage
+        self.cooldown = cooldown
+        
         self.image = pygame.Surface([width, height])
         self.image.fill(color)
         self.rect = self.image.get_rect()
@@ -26,12 +30,22 @@ class Item(pygame.sprite.Sprite):
         self.dragging = False
 
     def draw(self, screen):
-        """Draws the item on the screen."""
+        """Draws the item and its stats on the screen."""
+        # Draw the item block
         screen.blit(self.image, self.rect)
+        
+        # Setup font
         font = pygame.font.SysFont(None, 24)
-        text = font.render(self.name, True, (0,0,0))
-        text_rect = text.get_rect(center=self.rect.center)
-        screen.blit(text, text_rect)
+        
+        # Draw the name
+        name_text = font.render(self.name, True, FONT_COLOR)
+        name_rect = name_text.get_rect(center=(self.rect.centerx, self.rect.centery - 10))
+        screen.blit(name_text, name_rect)
+
+        # Draw the stats
+        stats_text = font.render(f"Dmg: {self.damage}", True, FONT_COLOR)
+        stats_rect = stats_text.get_rect(center=(self.rect.centerx, self.rect.centery + 10))
+        screen.blit(stats_text, stats_rect)
 
 
 # --- Main Game Function ---
@@ -42,11 +56,10 @@ def game_loop():
     pygame.display.set_caption("Backpack Battles Simulator - MVP")
     clock = pygame.time.Clock()
 
-    # --- Create Items ---
-    # Using a sprite group to manage all items
+    # --- Create Items (UPDATED with stats) ---
     all_sprites = pygame.sprite.Group()
-    item1 = Item((255, 100, 100), GRID_SIZE, GRID_SIZE, 550, 50, "Sword")
-    item2 = Item((100, 100, 255), GRID_SIZE * 2, GRID_SIZE, 550, 150, "Shield")
+    item1 = Item((255, 100, 100), GRID_SIZE, GRID_SIZE, 550, 50, name="Sword", damage=5, cooldown=1.8)
+    item2 = Item((100, 100, 255), GRID_SIZE * 2, GRID_SIZE, 550, 150, name="Shield", damage=1, cooldown=2.0)
     all_sprites.add(item1, item2)
     
     selected_item = None
@@ -54,7 +67,7 @@ def game_loop():
     # --- Backpack Grid ---
     backpack_rect = pygame.Rect(50, 50, BACKPACK_COLS * GRID_SIZE, BACKPACK_ROWS * GRID_SIZE)
 
-    # --- Game Loop ---
+    # --- Game Loop (No changes here, logic remains the same) ---
     running = True
     while running:
         for event in pygame.event.get():
@@ -117,3 +130,5 @@ def game_loop():
 
 if __name__ == "__main__":
     game_loop()
+
+
