@@ -24,51 +24,48 @@ Follow these instructions to get a copy of the project up and running on your lo
 
 1. Clone the Repository  
    Open your terminal or command prompt and clone the repository to your local machine:  
-```
    git clone \[https://github.com/BCSZSZ/BPB\_MVP.git\](https://github.com/BCSZSZ/BPB\_MVP.git)
-```
-3. **Navigate to the Project Directory**  
-```
+
+2. **Navigate to the Project Directory**  
    cd BPB\_MVP
-```
-5. Create a Python Virtual Environment  
+
+3. Create a Python Virtual Environment  
    It's highly recommended to use a virtual environment to keep project dependencies isolated.  
-```
-   python \-m venv venv
-```
-7. Activate the Virtual Environment  
+   ```python \-m venv venv```
+
+4. Activate the Virtual Environment  
    You must activate the environment every time you work on the project.  
    * **On Windows (Command Prompt):**  
-   ```
-     venv\\Scripts\\activate
-```
+     ```venv\\Scripts\\activate```
+
    * On Windows (PowerShell):  
      You may first need to adjust your script execution policy for the current session.  
-```
-  Set-ExecutionPolicy \-ExecutionPolicy RemoteSigned \-Scope Process
-```
-     Then, you can activate the environment:
-     ```
-     venv\\Scripts\\activate
-      ```
+     ```Set-ExecutionPolicy \-ExecutionPolicy RemoteSigned \-Scope Process```
+
+     Then, you can activate the environment:  
+     ```venv\\Scripts\\activate```
+
    * **On macOS and Linux:**  
-```
-     source venv/bin/activate
-```
+     ```source venv/bin/activate```
+
 Your terminal prompt should now be prefixed with (venv).
 
 5. Install Dependencies  
-   With the virtual environment active, install the necessary Python packages.
-   ```  
-   pip install \-r requirements.txt
-   ```
+   With the virtual environment active, install the necessary Python packages.  
+   ```pip install \-r requirements.txt```
+
 ## **Usage**
 
 Once the installation is complete, you can run the simulator with the following command:
-```
-python main.py
-```
+
+```python main.py```
+
 A window should appear displaying the backpack grid and the draggable items.
 
+## **Contributing**
+
+Contributions are welcome\! If you have ideas for improvements or want to fix a bug, please feel free to fork the repository and submit a pull request. For more details, see the CONTRIBUTING.md file.
+
+## **License**
 
 This project is licensed under the MIT License \- see the [LICENSE](https://www.google.com/search?q=LICENSE) file for details.
