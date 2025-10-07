@@ -1,7 +1,7 @@
 import pygame
 import sys
 from enum import Enum, auto
-from typing import List, Optional
+from typing import List, Optional, Dict, Tuple
 
 # --- Constants ---
 SCREEN_WIDTH = 900
@@ -10,6 +10,7 @@ GRID_SIZE = 40 # Made grid smaller to fit larger backpack
 BG_COLOR = (255, 255, 255)
 FONT_COLOR = (10, 10, 10)
 GRID_LINE_COLOR = (200, 200, 200)
+INVALID_PLACEMENT_COLOR = (255, 0, 0, 100) # Red tint for invalid placement
 
 # Backpack dimensions
 BACKPACK_COLS = 9
@@ -90,31 +91,68 @@ class Item(pygame.sprite.Sprite):
 
         return surface
 
+    def rotate(self):
+        """Rotates the item's shape_matrix 90 degrees clockwise."""
+        old_center = self.rect.center
+
+        transposed_matrix = list(zip(*self.shape_matrix))
+        self.shape_matrix = [list(row)[::-1] for row in transposed_matrix]
+
+        self.grid_height = len(self.shape_matrix)
+        self.grid_width = len(self.shape_matrix[0])
+
+        self.image = self.create_item_surface()
+        self.rect = self.image.get_rect(center=old_center)
+
     def draw_at_grid(self, screen, grid_x, grid_y):
         """Draws the item's surface at a specific grid coordinate on the screen."""
         screen_x = BACKPACK_X + grid_x * GRID_SIZE
         screen_y = BACKPACK_Y + grid_y * GRID_SIZE
         screen.blit(self.image, (screen_x, screen_y))
-        
+
+# --- Helper Function for Collision (UPDATED) ---
+def is_placement_valid(item_to_place: Item, grid_x: int, grid_y: int, placed_items: Dict[Tuple[int, int], Item]) -> bool:
+    """Checks if placing an item at a grid position is valid. Only OCCUPIED cells matter for bounds and collision."""
+    
+    # First, build a simple occupancy map of all placed items. This map stores which grid cells
+    # contain an OCCUPIED part of an item.
+    occupied_cells = set()
+    for (px, py), p_item in placed_items.items():
+        for r_idx, row in enumerate(p_item.shape_matrix):
+            for c_idx, cell_type in enumerate(row):
+                if cell_type == GridType.OCCUPIED:
+                    occupied_cells.add((px + c_idx, py + r_idx))
+
+    # Now, check if the item we're trying to place is valid.
+    # We only care about the cells that are part of the item's physical body.
+    for r_idx, row in enumerate(item_to_place.shape_matrix):
+        for c_idx, cell_type in enumerate(row):
+            if cell_type == GridType.OCCUPIED:
+                # Calculate the absolute grid position of this physical cell
+                abs_x = grid_x + c_idx
+                abs_y = grid_y + r_idx
+
+                # 1. Check if this physical cell is inside the backpack bounds.
+                if not (0 <= abs_x < BACKPACK_COLS and 0 <= abs_y < BACKPACK_ROWS):
+                    return False # This part of the item is off the board.
+
+                # 2. Check if this physical cell collides with another item's physical cell.
+                if (abs_x, abs_y) in occupied_cells:
+                    return False # Collision detected.
+    
+    return True # If we get here, all physical parts are validly placed.
+
+
 # --- Main Game Function ---
 def game_loop():
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("Backpack Battles - Matrix System")
+    pygame.display.set_caption("Backpack Battles - Collision Detection")
     clock = pygame.time.Clock()
 
     # --- Define Item Shapes ---
-    # Centered in a 3x3 matrix for simplicity, can be expanded to 9x7
-    sword_shape = [
-        [GridType.EMPTY, GridType.STAR_A, GridType.EMPTY],
-        [GridType.EMPTY, GridType.OCCUPIED, GridType.EMPTY],
-        [GridType.EMPTY, GridType.EMPTY, GridType.EMPTY],
-    ]
-    
-    shield_shape = [
-        [GridType.EMPTY,   GridType.STAR_B,  GridType.STAR_B,  GridType.EMPTY],
-        [GridType.OCCUPIED, GridType.OCCUPIED, GridType.OCCUPIED, GridType.STAR_A],
-    ]
+    sword_shape = [[GridType.EMPTY, GridType.STAR_A, GridType.EMPTY], [GridType.EMPTY, GridType.OCCUPIED, GridType.EMPTY], [GridType.EMPTY, GridType.EMPTY, GridType.EMPTY]]
+    shield_shape = [[GridType.EMPTY, GridType.STAR_B, GridType.STAR_B, GridType.EMPTY], [GridType.OCCUPIED, GridType.OCCUPIED, GridType.OCCUPIED, GridType.STAR_A]]
 
     # --- Create Items ---
     items_in_shop = [
@@ -122,13 +160,11 @@ def game_loop():
         Item(600, 200, "Shield", Rarity.RARE, shield_shape, damage=1)
     ]
     
-    placed_items = {} # Use a dict to store items and their grid position: {(x,y): item}
-    selected_item = None # This will be the CLONE of a shop item that is being dragged
+    placed_items = {}
+    selected_item = None
     
-    # --- UI Elements ---
     font = pygame.font.SysFont(None, 30)
     calc_button = pygame.Rect(600, 500, 200, 50)
-
 
     # --- Game Loop ---
     running = True
@@ -138,64 +174,51 @@ def game_loop():
                 running = False
                 
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:
+                if event.button == 3 and selected_item and selected_item.dragging:
+                    selected_item.rotate()
+                    mouse_x, mouse_y = event.pos
+                    offset_x = selected_item.rect.x - mouse_x
+                    offset_y = selected_item.rect.y - mouse_y
+                
+                elif event.button == 1:
                     clicked_on_item = False
-                    # Priority 1: Pick up an item from the backpack
-                    # Use list() to create a copy, allowing us to modify the dictionary while iterating
+                    # Priority 1: Pick up from backpack
                     for pos, item in list(placed_items.items()):
-                        item_rect_on_grid = pygame.Rect(
-                            BACKPACK_X + pos[0] * GRID_SIZE,
-                            BACKPACK_Y + pos[1] * GRID_SIZE,
-                            item.rect.width,
-                            item.rect.height
-                        )
+                        item_rect_on_grid = pygame.Rect(BACKPACK_X + pos[0] * GRID_SIZE, BACKPACK_Y + pos[1] * GRID_SIZE, item.rect.width, item.rect.height)
                         if item_rect_on_grid.collidepoint(event.pos):
                             selected_item = item
                             selected_item.dragging = True
-                            # Move the item's own rect to its current screen position before calculating offset
                             selected_item.rect.topleft = item_rect_on_grid.topleft
                             mouse_x, mouse_y = event.pos
-                            offset_x = selected_item.rect.x - mouse_x
-                            offset_y = selected_item.rect.y - mouse_y
-                            del placed_items[pos] # Remove from backpack to "pick it up"
+                            offset_x, offset_y = selected_item.rect.x - mouse_x, selected_item.rect.y - mouse_y
+                            del placed_items[pos]
                             clicked_on_item = True
-                            break # Item found, stop searching
+                            break
                     
-                    # Priority 2: If nothing was picked from backpack, pick from shop
+                    # Priority 2: Pick from shop
                     if not clicked_on_item:
                         for item_template in items_in_shop:
                             if item_template.rect.collidepoint(event.pos):
-                                # Create a clone of the item to drag
-                                selected_item = Item(
-                                    item_template.rect.x, item_template.rect.y, item_template.name, 
-                                    item_template.rarity, item_template.shape_matrix, item_template.damage
-                                )
+                                selected_item = Item(item_template.rect.x, item_template.rect.y, item_template.name, item_template.rarity, item_template.shape_matrix, item_template.damage)
                                 selected_item.dragging = True
                                 mouse_x, mouse_y = event.pos
-                                offset_x = selected_item.rect.x - mouse_x
-                                offset_y = selected_item.rect.y - mouse_y
+                                offset_x, offset_y = selected_item.rect.x - mouse_x, selected_item.rect.y - mouse_y
                                 break
                             
-                    # Check for button click
+                    # Button click
                     if calc_button.collidepoint(event.pos):
-                        print("--- Calculating Interactions ---")
-                        for pos, item in placed_items.items():
-                            print(f"Placed {item.name} at {pos}")
+                        print("--- Calculating Interactions (Not Implemented Yet) ---")
 
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1 and selected_item:
                     selected_item.dragging = False
                     
-                    # Snap to backpack grid based on the item's top-left corner
-                    # Using round() snaps to the NEAREST cell, which feels more natural
                     grid_x = round((selected_item.rect.left - BACKPACK_X) / GRID_SIZE)
                     grid_y = round((selected_item.rect.top - BACKPACK_Y) / GRID_SIZE)
 
-                    # Check if placement is valid (within bounds)
-                    if 0 <= grid_x < BACKPACK_COLS and 0 <= grid_y < BACKPACK_ROWS:
+                    if is_placement_valid(selected_item, grid_x, grid_y, placed_items):
                         placed_items[(grid_x, grid_y)] = selected_item
                     
-                    # The dragged item is now either placed or discarded, so we clear the reference
                     selected_item = None
                     
             elif event.type == pygame.MOUSEMOTION:
@@ -207,7 +230,6 @@ def game_loop():
         # --- Drawing ---
         screen.fill(BG_COLOR)
         
-        # Draw Backpack
         backpack_rect = pygame.Rect(BACKPACK_X, BACKPACK_Y, BACKPACK_COLS * GRID_SIZE, BACKPACK_ROWS * GRID_SIZE)
         pygame.draw.rect(screen, (230, 230, 230), backpack_rect)
         for x in range(BACKPACK_X, backpack_rect.right, GRID_SIZE):
@@ -215,19 +237,24 @@ def game_loop():
         for y in range(BACKPACK_Y, backpack_rect.bottom, GRID_SIZE):
             pygame.draw.line(screen, GRID_LINE_COLOR, (BACKPACK_X, y), (backpack_rect.right, y))
 
-        # Draw placed items
         for (grid_x, grid_y), item in placed_items.items():
             item.draw_at_grid(screen, grid_x, grid_y)
             
-        # Draw shop items (they never move)
         for item in items_in_shop:
             screen.blit(item.image, item.rect)
         
-        # Draw the selected item clone while it's being dragged
         if selected_item and selected_item.dragging:
-            screen.blit(selected_item.image, selected_item.rect)
+            # Show visual feedback for invalid placement
+            current_grid_x = round((selected_item.rect.left - BACKPACK_X) / GRID_SIZE)
+            current_grid_y = round((selected_item.rect.top - BACKPACK_Y) / GRID_SIZE)
+            if not is_placement_valid(selected_item, current_grid_x, current_grid_y, placed_items):
+                # Create a temporary surface to draw the red tint
+                tint_surface = selected_item.image.copy()
+                tint_surface.fill(INVALID_PLACEMENT_COLOR, special_flags=pygame.BLEND_RGBA_MULT)
+                screen.blit(tint_surface, selected_item.rect.topleft)
+            else:
+                screen.blit(selected_item.image, selected_item.rect)
 
-        # Draw Button
         pygame.draw.rect(screen, (100, 200, 100), calc_button)
         btn_text = font.render("Calculate", True, FONT_COLOR)
         screen.blit(btn_text, btn_text.get_rect(center=calc_button.center))
