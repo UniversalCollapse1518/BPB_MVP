@@ -5,10 +5,11 @@
     "item_class": "NEUTRAL",
     "elements": ["MELEE"],
     "types": ["WEAPON"],
+    "base_score": 3,
     "shape_matrix": [
-      [0, 2, 0],
+      [0, 0, 0],
       [0, 1, 0],
-      [0, 0, 0]
+      [0, 1, 0]
     ]
   },
   "shield": {
@@ -17,6 +18,7 @@
     "item_class": "NEUTRAL",
     "elements": [],
     "types": ["SHIELD"],
+    "base_score": 3,
     "shape_matrix": [
       [1, 1],
       [1, 1]
@@ -28,12 +30,141 @@
     "item_class": "NEUTRAL",
     "elements": ["MELEE"],
     "types": ["WEAPON"],
+    "base_score": 6,
     "shape_matrix": [
       [0, 0, 0, 0, 0, 0, 0, 0, 0],
       [1, 1, 1, 1, 2, 2, 2, 2, 2],
       [0, 0, 0, 0, 0, 0, 0, 0, 0]
-
-    ]
-  }
+    ],
+    "star_effects": {
+        "STAR_A": {
+            "conditions": [
+                { "requires_empty": true }
+            ],
+            "effect": "ADD_SCORE_TO_SELF",
+            "value": 3
+        }
+    }
+  },
+  "Blackscroll": {
+    "name": "Black Scroll",
+    "rarity": "GODLY",
+    "item_class": "MAGE",
+    "elements": ["DARK","MAGIC"],
+    "types": ["SPELL"],
+    "base_score": 0,
+    "shape_matrix": [
+      [0, 0, 2, 0, 0],
+      [3, 0, 0, 3, 2],
+      [0, 0, 1, 1, 0],
+      [2, 3, 0, 0, 3],
+      [0, 0, 0, 2, 0]
+    ],
+    "star_effects": {
+        "STAR_A": {
+            "condition": {},
+            "effect": "MULTIPLY_SCORE_OF_TARGET",
+            "value": {
+                "base": 1.2,
+                "dynamic_bonus": {
+                    "per_activated_star": "STAR_B",
+                    "add": 0.05
+                }
+            }
+        },
+        "STAR_B": {
+            "condition": {"requires_element": "DARK"}
+        }
+    }
+  },
+  "RedBook": {
+    "name": "Red Book",
+    "rarity": "COMMON",
+    "item_class": "MAGE",
+    "elements": ["MAGIC"],
+    "types": ["SPELL"],
+    "base_score": 8,
+    "shape_matrix": [
+      [0, 2, 0],
+      [2, 1, 2],
+      [2, 1, 2],
+      [0, 2, 0]
+    ],
+    "star_effects": {
+      "STAR_A": {
+        "condition": {"requires_type": "SPELL"},
+        "effect": "ADD_SCORE_TO_SELF",
+        "value": 5
+      }
+    }
+  },
+  "Pan": {
+    "name": "Pan",
+    "rarity": "COMMON",
+    "item_class": "NEUTRAL",
+    "elements": [],
+    "types": ["WEAPON"],
+    "base_score": 6,
+    "shape_matrix": [
+      [0, 2, 0, 0],
+      [2, 1, 2, 0],
+      [2, 1, 1, 2],
+      [0, 2, 2, 0]
+    ],
+    "star_effects": {
+      "STAR_A": {
+        "condition": {"requires_type": "FOOD"},
+        "effect": "ADD_SCORE_TO_SELF",
+        "value": 2
+      }
+    }
+  },
+  "BlueBerry": {
+    "name": "Blue Berry",
+    "rarity": "RARE",
+    "item_class": "NEUTRAL",
+    "elements": ["NATURE","MAGIC"],
+    "types": ["FOOD"],
+    "base_score": 2,
+    "shape_matrix": [
+      [0, 2, 0],
+      [2, 1, 2],
+      [0, 2, 0]
+    ],
+    "star_effects": {
+      "STAR_A": {
+        "condition": {
+          "requires_type": "FOOD",
+          "must_be_different": true
+        },
+        "effect": "MULTIPLY_SCORE_OF_SELF",
+        "value": 1.1
+      }
+    }
+  }, 
+  "Banana": {
+    "name": "Banana",
+    "rarity": "COMMON",
+    "item_class": "NEUTRAL",
+    "elements": ["NATURE"],
+    "types": ["FOOD"],
+    "base_score": 3,
+    "shape_matrix": [
+      [0, 2, 0, 0],
+      [2, 1, 2, 0],
+      [2, 1, 1, 2],
+      [0, 2, 2, 0]
+    ],
+    "star_effects": {
+      "STAR_A": {
+        "condition": {
+          "requires_type": "FOOD",
+          "must_be_different": true
+        },
+        "effect": "MULTIPLY_SCORE_OF_SELF",
+        "value": 1.1
+      }
+    }
+  }  
 }
 
