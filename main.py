@@ -6,7 +6,7 @@ from typing import List, Optional, Dict, Tuple
 import math
 
 # --- Constants ---
-SCREEN_WIDTH = 900
+SCREEN_WIDTH = 1200
 SCREEN_HEIGHT = 700
 GRID_SIZE = 40
 BG_COLOR = (255, 255, 255)
@@ -19,58 +19,27 @@ BACKPACK_COLS = 9
 BACKPACK_ROWS = 7
 BACKPACK_X, BACKPACK_Y = 50, 50
 
-# Shop dimensions
-SHOP_X, SHOP_Y = 600, 50
-SHOP_WIDTH, SHOP_HEIGHT = 250, 400
+# --- NEW SCALABLE LAYOUT ---
+PANEL_START_X = BACKPACK_X + (BACKPACK_COLS * GRID_SIZE) + 50
+PANEL_Y = 50
+PANEL_HEIGHT = 600
+
+INFO_PANEL_X = PANEL_START_X
+INFO_PANEL_WIDTH = 250
+
+SHOP_X = INFO_PANEL_X + INFO_PANEL_WIDTH + 20
+SHOP_WIDTH = 200
 
 # --- Enums for Item Properties ---
-
-class GridType(Enum):
-    EMPTY = 0
-    OCCUPIED = 1
-    STAR_A = 2
-    STAR_B = 3
-    STAR_C = 4
-
-class Rarity(Enum):
-    COMMON = "Common"
-    RARE = "Rare"
-    EPIC = "Epic"
-    LEGENDARY = "Legendary"
-    GODLY = "Godly"
-    UNIQUE = "Unique"
-
-class ItemClass(Enum):
-    NEUTRAL = "Neutral"
-    RANGER = "Ranger"
-    REAPER = "Reaper"
-    BERSERKER = "Berserker"
-    PYROMANCER = "Pyromancer"
-    MAGE = "Mage"
-    ADVENTURER = "Adventurer"
-
-class Element(Enum):
-    MELEE = "Melee"
-    RANGED = "Ranged"
-    MAGIC = "Magic"
-
-class ItemType(Enum):
-    WEAPON = "Weapon"
-    SHIELD = "Shield"
-    PET = "Pet"
+class GridType(Enum): EMPTY, OCCUPIED, STAR_A, STAR_B, STAR_C = 0, 1, 2, 3, 4
+class Rarity(Enum): COMMON, RARE, EPIC, LEGENDARY, GODLY, UNIQUE = "Common", "Rare", "Epic", "Legendary", "Godly", "Unique"
+class ItemClass(Enum): NEUTRAL, RANGER, REAPER, BERSERKER, PYROMANCER, MAGE, ADVENTURER = "Neutral", "Ranger", "Reaper", "Berserker", "Pyromancer", "Mage", "Adventurer"
+class Element(Enum): MELEE, RANGED, MAGIC = "Melee", "Ranged", "Magic"
+class ItemType(Enum): WEAPON, SHIELD, PET = "Weapon", "Shield", "Pet"
 
 # --- Rarity and Star Colors ---
-RARITY_BORDER_COLORS = {
-    Rarity.COMMON: (150, 150, 150), Rarity.RARE: (0, 100, 255),
-    Rarity.EPIC: (138, 43, 226), Rarity.LEGENDARY: (255, 165, 0),
-    Rarity.GODLY: (255, 215, 0), Rarity.UNIQUE: (255, 20, 147)
-}
-# --- QOL UPDATE: New Star Colors and Shapes ---
-STAR_SHAPE_COLORS = {
-    GridType.STAR_A: (255, 215, 0),   # Yellow
-    GridType.STAR_B: (50, 205, 50),    # Green
-    GridType.STAR_C: (148, 0, 211)     # Purple
-}
+RARITY_BORDER_COLORS = { Rarity.COMMON: (150, 150, 150), Rarity.RARE: (0, 100, 255), Rarity.EPIC: (138, 43, 226), Rarity.LEGENDARY: (255, 165, 0), Rarity.GODLY: (255, 215, 0), Rarity.UNIQUE: (255, 20, 147) }
+STAR_SHAPE_COLORS = { GridType.STAR_A: (255, 215, 0), GridType.STAR_B: (50, 205, 50), GridType.STAR_C: (148, 0, 211) }
 
 # --- Item Class ---
 class Item(pygame.sprite.Sprite):
@@ -86,230 +55,233 @@ class Item(pygame.sprite.Sprite):
         self.shape_matrix = shape_matrix
         self.grid_width = len(shape_matrix[0]) if shape_matrix else 0
         self.grid_height = len(shape_matrix)
-        
         self.body_image = self.create_body_surface()
         self.rect = self.body_image.get_rect(topleft=(x, y))
+        self.base_y = y # Store original y for scrolling
         self.dragging = False
+        self.activated_stars = {GridType.STAR_A: 0, GridType.STAR_B: 0, GridType.STAR_C: 0}
 
     def create_body_surface(self):
-        width_px = self.grid_width * GRID_SIZE
-        height_px = self.grid_height * GRID_SIZE
+        width_px, height_px = self.grid_width * GRID_SIZE, self.grid_height * GRID_SIZE
         surface = pygame.Surface((width_px, height_px), pygame.SRCALPHA)
-        for r_idx, row in enumerate(self.shape_matrix):
-            for c_idx, cell_type in enumerate(row):
-                if cell_type == GridType.OCCUPIED:
-                    x, y = c_idx * GRID_SIZE, r_idx * GRID_SIZE
-                    pygame.draw.rect(surface, (200, 200, 200), (x, y, GRID_SIZE, GRID_SIZE))
-                    pygame.draw.rect(surface, RARITY_BORDER_COLORS[self.rarity], (x, y, GRID_SIZE, GRID_SIZE), 2)
+        occupied_coords = []
+        for r, row in enumerate(self.shape_matrix):
+            for c, cell in enumerate(row):
+                if cell == GridType.OCCUPIED:
+                    occupied_coords.append((c, r))
+                    pygame.draw.rect(surface, (200, 200, 200), (c * GRID_SIZE, r * GRID_SIZE, GRID_SIZE, GRID_SIZE))
+                    pygame.draw.rect(surface, RARITY_BORDER_COLORS[self.rarity], (c * GRID_SIZE, r * GRID_SIZE, GRID_SIZE, GRID_SIZE), 2)
+        if occupied_coords:
+            min_c, max_c = min(c for c, r in occupied_coords), max(c for c, r in occupied_coords)
+            min_r, max_r = min(r for c, r in occupied_coords), max(r for c, r in occupied_coords)
+            center_x, center_y = (min_c + max_c + 1) * GRID_SIZE / 2, (min_r + max_r + 1) * GRID_SIZE / 2
+            font = pygame.font.SysFont(None, 20)
+            name_text = (self.name[:4] + '..') if len(self.name) > 6 else self.name
+            text_surf = font.render(name_text, True, FONT_COLOR)
+            surface.blit(text_surf, text_surf.get_rect(center=(center_x, center_y)))
         return surface
 
     def draw_stars(self, screen, top_left_pos):
-        """Draws the star shapes directly onto the screen."""
-        for r_idx, row in enumerate(self.shape_matrix):
-            for c_idx, cell_type in enumerate(row):
-                if cell_type in STAR_SHAPE_COLORS:
-                    center_x = top_left_pos[0] + c_idx * GRID_SIZE + GRID_SIZE // 2
-                    center_y = top_left_pos[1] + r_idx * GRID_SIZE + GRID_SIZE // 2
-                    color = STAR_SHAPE_COLORS[cell_type]
-                    
-                    if cell_type == GridType.STAR_A: # 5-pointed star
-                        points = []
+        for r, row in enumerate(self.shape_matrix):
+            for c, cell in enumerate(row):
+                if cell in STAR_SHAPE_COLORS:
+                    cx, cy = top_left_pos[0] + c*GRID_SIZE + GRID_SIZE//2, top_left_pos[1] + r*GRID_SIZE + GRID_SIZE//2
+                    color = STAR_SHAPE_COLORS[cell]
+                    if cell == GridType.STAR_A:
+                        pts = []
                         for i in range(5):
-                            angle_rad = math.radians(18 + i * 72)
-                            outer_x = center_x + (GRID_SIZE / 2) * math.cos(angle_rad)
-                            outer_y = center_y + (GRID_SIZE / 2) * math.sin(angle_rad)
-                            points.append((outer_x, outer_y))
-                            
-                            angle_rad = math.radians(54 + i * 72)
-                            inner_x = center_x + (GRID_SIZE / 4) * math.cos(angle_rad)
-                            inner_y = center_y + (GRID_SIZE / 4) * math.sin(angle_rad)
-                            points.append((inner_x, inner_y))
-                        pygame.draw.polygon(screen, color, points)
+                            for ang in [18, 54]:
+                                rad = math.radians(ang + i*72); scale = GRID_SIZE/2 if ang == 18 else GRID_SIZE/4
+                                pts.append((cx + scale*math.cos(rad), cy + scale*math.sin(rad)))
+                        pygame.draw.polygon(screen, color, pts)
+                    elif cell == GridType.STAR_B: pygame.draw.polygon(screen, color, [(cx,cy-GRID_SIZE*0.4), (cx+GRID_SIZE*0.4,cy), (cx,cy+GRID_SIZE*0.4), (cx-GRID_SIZE*0.4,cy)])
+                    elif cell == GridType.STAR_C: pygame.draw.polygon(screen, color, [(cx,cy-GRID_SIZE*0.35), (cx-GRID_SIZE*0.35,cy+GRID_SIZE*0.35), (cx+GRID_SIZE*0.35,cy+GRID_SIZE*0.35)])
 
-                    elif cell_type == GridType.STAR_B: # Diamond
-                        radius = GRID_SIZE * 0.4
-                        points = [
-                            (center_x, center_y - radius), (center_x + radius, center_y),
-                            (center_x, center_y + radius), (center_x - radius, center_y)
-                        ]
-                        pygame.draw.polygon(screen, color, points)
-
-                    elif cell_type == GridType.STAR_C: # Triangle
-                        height = GRID_SIZE * 0.7
-                        points = [
-                            (center_x, center_y - height / 2),
-                            (center_x - height / 2, center_y + height / 2),
-                            (center_x + height / 2, center_y + height / 2)
-                        ]
-                        pygame.draw.polygon(screen, color, points)
-
-    def is_mouse_over_body(self, mouse_pos):
-        """Checks if the mouse is over an OCCUPIED part of the item."""
-        if self.rect.collidepoint(mouse_pos):
-            rel_x = mouse_pos[0] - self.rect.x
-            rel_y = mouse_pos[1] - self.rect.y
-            grid_col = rel_x // GRID_SIZE
-            grid_row = rel_y // GRID_SIZE
-            if 0 <= grid_row < self.grid_height and 0 <= grid_col < self.grid_width:
-                return self.shape_matrix[grid_row][grid_col] == GridType.OCCUPIED
+    def is_mouse_over_body(self, mouse_pos, current_pos):
+        # Create a temporary rect for accurate collision detection
+        temp_rect = self.body_image.get_rect(topleft=current_pos)
+        if temp_rect.collidepoint(mouse_pos):
+            rx, ry = mouse_pos[0]-temp_rect.x, mouse_pos[1]-temp_rect.y
+            gc, gr = rx // GRID_SIZE, ry // GRID_SIZE
+            if 0 <= gr < self.grid_height and 0 <= gc < self.grid_width: return self.shape_matrix[gr][gc] == GridType.OCCUPIED
         return False
         
     def rotate(self):
-        transposed_matrix = list(zip(*self.shape_matrix))
-        self.shape_matrix = [list(row)[::-1] for row in transposed_matrix]
-        self.grid_height = len(self.shape_matrix)
-        self.grid_width = len(self.shape_matrix[0])
+        self.shape_matrix = [list(row)[::-1] for row in zip(*self.shape_matrix)]
+        self.grid_height, self.grid_width = len(self.shape_matrix), len(self.shape_matrix[0])
         self.body_image = self.create_body_surface()
 
-# --- Data Loading Function ---
+# --- Calculation Engine ---
+class CalculationEngine:
+    def run(self, placed_items: Dict[Tuple[int, int], Item]):
+        occupancy_grid: List[List[Optional[Item]]] = [[None for _ in range(BACKPACK_COLS)] for _ in range(BACKPACK_ROWS)]
+        for (gx, gy), item in placed_items.items():
+            for r, row in enumerate(item.shape_matrix):
+                for c, cell_type in enumerate(row):
+                    if cell_type == GridType.OCCUPIED:
+                        abs_x, abs_y = gx + c, gy + r
+                        if 0 <= abs_y < BACKPACK_ROWS and 0 <= abs_x < BACKPACK_COLS: occupancy_grid[abs_y][abs_x] = item
+        for (gx, gy), source_item in placed_items.items():
+            source_item.activated_stars = {GridType.STAR_A: 0, GridType.STAR_B: 0, GridType.STAR_C: 0}
+            triggered_by = {GridType.STAR_A: set(), GridType.STAR_B: set(), GridType.STAR_C: set()}
+            for r, row in enumerate(source_item.shape_matrix):
+                for c, cell_type in enumerate(row):
+                    if cell_type in triggered_by:
+                        abs_x, abs_y = gx + c, gy + r
+                        if 0 <= abs_y < BACKPACK_ROWS and 0 <= abs_x < BACKPACK_COLS:
+                            target_item = occupancy_grid[abs_y][abs_x]
+                            if target_item and target_item is not source_item and target_item not in triggered_by[cell_type]:
+                                source_item.activated_stars[cell_type] += 1
+                                triggered_by[cell_type].add(target_item)
+
+# --- Data Loading and Helper Functions ---
 def load_items_from_file(filepath: str) -> List[Item]:
-    shop_items = []
+    items = []
     try:
         with open(filepath, 'r') as f: data = json.load(f)
         y_offset = 0
         for item_data in data.values():
-            rarity = Rarity[item_data['rarity']]
-            item_class = ItemClass[item_data['item_class']]
-            elements = [Element[e] for e in item_data.get('elements', [])]
-            types = [ItemType[t] for t in item_data.get('types', [])]
-            shape_matrix = [[GridType(cell) for cell in row] for row in item_data['shape_matrix']]
-            item = Item(SHOP_X + 10, SHOP_Y + 10 + y_offset, item_data['name'], rarity, item_class, elements, types, shape_matrix)
-            shop_items.append(item)
+            item = Item(SHOP_X + 10, PANEL_Y + 10 + y_offset, item_data['name'], Rarity[item_data['rarity']], 
+                        ItemClass[item_data['item_class']], [Element[e] for e in item_data.get('elements', [])], 
+                        [ItemType[t] for t in item_data.get('types', [])], [[GridType(c) for c in r] for r in item_data['shape_matrix']])
+            items.append(item)
             y_offset += item.rect.height + 10
     except Exception as e: print(f"Error loading items: {e}")
-    return shop_items
+    return items
 
-# --- Helper Function for Collision ---
-def is_placement_valid(item_to_place: Item, grid_x: int, grid_y: int, placed_items: Dict[Tuple[int, int], Item]) -> bool:
-    occupied_cells = set()
-    for (px, py), p_item in placed_items.items():
-        for r_idx, row in enumerate(p_item.shape_matrix):
-            for c_idx, cell_type in enumerate(row):
-                if cell_type == GridType.OCCUPIED:
-                    occupied_cells.add((px + c_idx, py + r_idx))
-    for r_idx, row in enumerate(item_to_place.shape_matrix):
-        for c_idx, cell_type in enumerate(row):
-            if cell_type == GridType.OCCUPIED:
-                abs_x, abs_y = grid_x + c_idx, grid_y + r_idx
-                if not (0 <= abs_x < BACKPACK_COLS and 0 <= abs_y < BACKPACK_ROWS): return False
-                if (abs_x, abs_y) in occupied_cells: return False
+def is_placement_valid(item, gx, gy, items_dict):
+    occupied = set()
+    for (px, py), p_item in items_dict.items():
+        for r, row in enumerate(p_item.shape_matrix):
+            for c, cell in enumerate(row):
+                if cell == GridType.OCCUPIED: occupied.add((px + c, py + r))
+    for r, row in enumerate(item.shape_matrix):
+        for c, cell in enumerate(row):
+            if cell == GridType.OCCUPIED:
+                ax, ay = gx + c, gy + r
+                if not (0 <= ax < BACKPACK_COLS and 0 <= ay < BACKPACK_ROWS): return False
+                if (ax, ay) in occupied: return False
     return True
 
 # --- Main Game Function ---
 def game_loop():
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("Backpack Battles - QoL v2")
+    pygame.display.set_caption("Backpack Battles - Scalable UI")
     clock = pygame.time.Clock()
 
     items_in_shop = load_items_from_file('items.json')
     placed_items = {}
     selected_item = None
+    engine = CalculationEngine()
     
-    font = pygame.font.SysFont(None, 30)
-    calc_button = pygame.Rect(600, 500, 200, 50)
-    shop_area_rect = pygame.Rect(SHOP_X, SHOP_Y, SHOP_WIDTH, SHOP_HEIGHT)
-
+    font_large, font_small = pygame.font.SysFont(None, 36), pygame.font.SysFont(None, 28)
+    calc_button = pygame.Rect(PANEL_START_X, 660, INFO_PANEL_WIDTH + SHOP_WIDTH + 20, 30)
+    shop_area_rect = pygame.Rect(SHOP_X, PANEL_Y, SHOP_WIDTH, PANEL_HEIGHT)
+    info_panel_rect = pygame.Rect(INFO_PANEL_X, PANEL_Y, INFO_PANEL_WIDTH, PANEL_HEIGHT)
+    
+    shop_scroll_y, info_scroll_y = 0, 0
+    total_shop_height = sum(item.rect.height + 10 for item in items_in_shop) if items_in_shop else 0
+    
     running = True
     while running:
         mouse_pos = pygame.mouse.get_pos()
         for event in pygame.event.get():
             if event.type == pygame.QUIT: running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 3 and selected_item and selected_item.dragging:
-                    rel_x = mouse_pos[0] - selected_item.rect.x
-                    rel_y = mouse_pos[1] - selected_item.rect.y
-                    pivot_col, pivot_row = rel_x // GRID_SIZE, rel_y // GRID_SIZE
-                    old_grid_height = selected_item.grid_height
+                if event.button == 4:
+                    if shop_area_rect.collidepoint(mouse_pos): shop_scroll_y = max(0, shop_scroll_y - 20)
+                    if info_panel_rect.collidepoint(mouse_pos): info_scroll_y = max(0, info_scroll_y - 20)
+                elif event.button == 5:
+                    if shop_area_rect.collidepoint(mouse_pos):
+                        max_scroll = max(0, total_shop_height - shop_area_rect.height)
+                        shop_scroll_y = min(max_scroll, shop_scroll_y + 20)
+                    if info_panel_rect.collidepoint(mouse_pos):
+                        max_scroll = max(0, 50 + len(placed_items) * 60 - info_panel_rect.height)
+                        info_scroll_y = min(max_scroll, info_scroll_y + 20)
+                elif event.button == 3 and selected_item and selected_item.dragging:
+                    rx, ry = mouse_pos[0]-selected_item.rect.x, mouse_pos[1]-selected_item.rect.y
+                    pc, pr = rx // GRID_SIZE, ry // GRID_SIZE
+                    ogh = selected_item.grid_height
                     selected_item.rotate() 
-                    new_pivot_col = old_grid_height - 1 - pivot_row
-                    new_pivot_row = pivot_col
-                    new_pivot_px_offset_x = new_pivot_col * GRID_SIZE
-                    new_pivot_px_offset_y = new_pivot_row * GRID_SIZE
-                    new_rect = selected_item.body_image.get_rect()
-                    new_rect.x = mouse_pos[0] - new_pivot_px_offset_x
-                    new_rect.y = mouse_pos[1] - new_pivot_px_offset_y
-                    selected_item.rect = new_rect
-                    offset_x, offset_y = selected_item.rect.x - mouse_pos[0], selected_item.rect.y - mouse_pos[1]
+                    npc, npr = ogh-1-pr, pc
+                    npx_off, npy_off = npc*GRID_SIZE, npr*GRID_SIZE
+                    nr = selected_item.body_image.get_rect(x=mouse_pos[0]-npx_off, y=mouse_pos[1]-npy_off)
+                    selected_item.rect, offset_x, offset_y = nr, nr.x-mouse_pos[0], nr.y-mouse_pos[1]
                 elif event.button == 1:
-                    clicked_on_item = False
+                    clicked = False
+                    # BUG FIX: Use temporary rect for pickup check
                     for pos, item in list(placed_items.items()):
-                        item.rect.topleft = (BACKPACK_X + pos[0] * GRID_SIZE, BACKPACK_Y + pos[1] * GRID_SIZE)
-                        if item.rect.collidepoint(mouse_pos):
-                            selected_item = item
-                            selected_item.dragging = True
-                            offset_x, offset_y = selected_item.rect.x - mouse_pos[0], selected_item.rect.y - mouse_pos[1]
-                            del placed_items[pos]
-                            clicked_on_item = True
-                            break
-                    if not clicked_on_item:
-                        for item_template in items_in_shop:
-                            if item_template.rect.collidepoint(mouse_pos):
-                                selected_item = Item(item_template.rect.x, item_template.rect.y, item_template.name, 
-                                                     item_template.rarity, item_template.item_class, item_template.elements,
-                                                     item_template.types, item_template.shape_matrix)
+                        item_pos_on_screen = (BACKPACK_X+pos[0]*GRID_SIZE, BACKPACK_Y+pos[1]*GRID_SIZE)
+                        if item.is_mouse_over_body(mouse_pos, item_pos_on_screen):
+                            selected_item, offset_x, offset_y = item, item_pos_on_screen[0]-mouse_pos[0], item_pos_on_screen[1]-mouse_pos[1]
+                            selected_item.dragging, selected_item.rect.topleft = True, item_pos_on_screen
+                            del placed_items[pos]; clicked = True; break
+                    if not clicked:
+                        for item_t in items_in_shop:
+                            if item_t.is_mouse_over_body(mouse_pos, item_t.rect.topleft):
+                                selected_item = Item(item_t.rect.x, item_t.rect.y, item_t.name, item_t.rarity, item_t.item_class, item_t.elements, item_t.types, item_t.shape_matrix)
                                 selected_item.dragging = True
-                                offset_x, offset_y = selected_item.rect.x - mouse_pos[0], selected_item.rect.y - mouse_pos[1]
-                                break
-                    if calc_button.collidepoint(mouse_pos): print("--- Calculating Interactions ---")
+                                offset_x, offset_y = item_t.rect.x-mouse_pos[0], item_t.rect.y-mouse_pos[1]; break
+                    if calc_button.collidepoint(mouse_pos): engine.run(placed_items)
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1 and selected_item:
                     selected_item.dragging = False
-                    grid_x = round((selected_item.rect.left - BACKPACK_X) / GRID_SIZE)
-                    grid_y = round((selected_item.rect.top - BACKPACK_Y) / GRID_SIZE)
-                    if is_placement_valid(selected_item, grid_x, grid_y, placed_items):
-                        placed_items[(grid_x, grid_y)] = selected_item
+                    gx, gy = round((selected_item.rect.left-BACKPACK_X)/GRID_SIZE), round((selected_item.rect.top-BACKPACK_Y)/GRID_SIZE)
+                    if is_placement_valid(selected_item, gx, gy, placed_items): placed_items[(gx, gy)] = selected_item
                     selected_item = None
             elif event.type == pygame.MOUSEMOTION:
                 if selected_item and selected_item.dragging:
-                    selected_item.rect.x = mouse_pos[0] + offset_x
-                    selected_item.rect.y = mouse_pos[1] + offset_y
+                    selected_item.rect.x, selected_item.rect.y = mouse_pos[0]+offset_x, mouse_pos[1]+offset_y
         
         # --- Drawing ---
         screen.fill(BG_COLOR)
-        pygame.draw.rect(screen, (230, 230, 230), pygame.Rect(BACKPACK_X, BACKPACK_Y, BACKPACK_COLS * GRID_SIZE, BACKPACK_ROWS * GRID_SIZE))
-        pygame.draw.rect(screen, (240, 240, 240), shop_area_rect, 2)
-        for x in range(BACKPACK_X, BACKPACK_X + BACKPACK_COLS * GRID_SIZE + 1, GRID_SIZE):
-            pygame.draw.line(screen, GRID_LINE_COLOR, (x, BACKPACK_Y), (x, BACKPACK_Y + BACKPACK_ROWS * GRID_SIZE))
-        for y in range(BACKPACK_Y, BACKPACK_Y + BACKPACK_ROWS * GRID_SIZE + 1, GRID_SIZE):
-            pygame.draw.line(screen, GRID_LINE_COLOR, (BACKPACK_X, y), (BACKPACK_X + BACKPACK_COLS * GRID_SIZE, y))
+        pygame.draw.rect(screen, (230,230,230), pygame.Rect(BACKPACK_X, BACKPACK_Y, BACKPACK_COLS*GRID_SIZE, BACKPACK_ROWS*GRID_SIZE))
+        pygame.draw.rect(screen, (240,240,240), shop_area_rect, 2); pygame.draw.rect(screen, (220,220,220), info_panel_rect); pygame.draw.rect(screen, (180,180,180), info_panel_rect, 2)
+        for x in range(BACKPACK_X, BACKPACK_X+BACKPACK_COLS*GRID_SIZE+1, GRID_SIZE): pygame.draw.line(screen, GRID_LINE_COLOR, (x, BACKPACK_Y), (x, BACKPACK_Y+BACKPACK_ROWS*GRID_SIZE))
+        for y in range(BACKPACK_Y, BACKPACK_Y+BACKPACK_ROWS*GRID_SIZE+1, GRID_SIZE): pygame.draw.line(screen, GRID_LINE_COLOR, (BACKPACK_X, y), (BACKPACK_X+BACKPACK_COLS*GRID_SIZE, y))
 
-        # --- DRAWING PASS 1: Item Bodies ---
-        for (grid_x, grid_y), item in placed_items.items():
-            item.rect.topleft = (BACKPACK_X + grid_x * GRID_SIZE, BACKPACK_Y + grid_y * GRID_SIZE)
-            screen.blit(item.body_image, item.rect)
-        for item in items_in_shop:
-            screen.blit(item.body_image, item.rect)
+        screen.set_clip(info_panel_rect)
+        screen.blit(font_large.render("Backpack Contents", True, FONT_COLOR), (info_panel_rect.x+10, info_panel_rect.y+10-info_scroll_y))
+        y_off = 50
+        for item in placed_items.values():
+            star_txt = f"A:{item.activated_stars[GridType.STAR_A]} B:{item.activated_stars[GridType.STAR_B]} C:{item.activated_stars[GridType.STAR_C]}"
+            screen.blit(font_small.render(f"- {item.name}", True, FONT_COLOR), (info_panel_rect.x+15, info_panel_rect.y+y_off-info_scroll_y))
+            screen.blit(font_small.render(star_txt, True, (60,60,60)), (info_panel_rect.x+25, info_panel_rect.y+y_off+25-info_scroll_y))
+            y_off += 60
+        screen.set_clip(None)
 
-        # --- DRAWING PASS 2: Item Stars (for hover effects) ---
-        for (grid_x, grid_y), item in placed_items.items():
-            if item.is_mouse_over_body(mouse_pos):
-                item.draw_stars(screen, item.rect.topleft)
-        for item in items_in_shop:
-            if item.is_mouse_over_body(mouse_pos):
-                item.draw_stars(screen, item.rect.topleft)
+        # --- BUG FIX: Proper Drawing Order ---
+        # Pass 1: Draw all bodies
+        screen.set_clip(shop_area_rect)
+        for item in items_in_shop: item.rect.y = item.base_y - shop_scroll_y; screen.blit(item.body_image, item.rect)
+        screen.set_clip(None)
+        for (gx, gy), item in placed_items.items(): screen.blit(item.body_image, (BACKPACK_X+gx*GRID_SIZE, BACKPACK_Y+gy*GRID_SIZE))
         
-        # --- DRAWING PASS 3: Dragged Item ---
+        # Pass 2: Draw all stars on hover
+        screen.set_clip(shop_area_rect)
+        for item in items_in_shop:
+            if item.is_mouse_over_body(mouse_pos, item.rect.topleft): item.draw_stars(screen, item.rect.topleft)
+        screen.set_clip(None)
+        for (gx, gy), item in placed_items.items():
+            item_pos = (BACKPACK_X+gx*GRID_SIZE, BACKPACK_Y+gy*GRID_SIZE)
+            if item.is_mouse_over_body(mouse_pos, item_pos): item.draw_stars(screen, item_pos)
+        
+        # Pass 3: Draw dragged item
         if selected_item and selected_item.dragging:
             screen.blit(selected_item.body_image, selected_item.rect)
-            selected_item.draw_stars(screen, selected_item.rect.topleft) # Always show stars when dragging
-            
-            grid_x, grid_y = round((selected_item.rect.left - BACKPACK_X)/GRID_SIZE), round((selected_item.rect.top - BACKPACK_Y)/GRID_SIZE)
-            if not is_placement_valid(selected_item, grid_x, grid_y, placed_items):
-                tint_surface = pygame.Surface(selected_item.rect.size, pygame.SRCALPHA)
-                tint_surface.fill(INVALID_PLACEMENT_COLOR)
-                screen.blit(tint_surface, selected_item.rect.topleft)
+            selected_item.draw_stars(screen, selected_item.rect.topleft)
+            gx, gy = round((selected_item.rect.left-BACKPACK_X)/GRID_SIZE), round((selected_item.rect.top-BACKPACK_Y)/GRID_SIZE)
+            if not is_placement_valid(selected_item, gx, gy, placed_items):
+                tint = pygame.Surface(selected_item.rect.size, pygame.SRCALPHA); tint.fill(INVALID_PLACEMENT_COLOR)
+                screen.blit(tint, selected_item.rect.topleft)
 
         pygame.draw.rect(screen, (100, 200, 100), calc_button)
-        btn_text = font.render("Calculate", True, FONT_COLOR)
-        screen.blit(btn_text, btn_text.get_rect(center=calc_button.center))
-
+        screen.blit(font_small.render("Calculate", True, FONT_COLOR), calc_button.inflate(-10,-10))
         pygame.display.flip()
         clock.tick(60)
-
     pygame.quit()
     sys.exit()
 
-if __name__ == "__main__":
-    game_loop()
+if __name__ == "__main__": game_loop()
 
