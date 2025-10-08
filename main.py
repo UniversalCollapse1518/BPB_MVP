@@ -98,12 +98,12 @@ class Item(pygame.sprite.Sprite):
                     elif cell == GridType.STAR_C: pygame.draw.polygon(screen, color, [(cx,cy-GRID_SIZE*0.35), (cx-GRID_SIZE*0.35,cy+GRID_SIZE*0.35), (cx+GRID_SIZE*0.35,cy+GRID_SIZE*0.35)])
 
     def is_mouse_over_body(self, mouse_pos, current_pos):
-        # Create a temporary rect for accurate collision detection
-        temp_rect = self.body_image.get_rect(topleft=current_pos)
-        if temp_rect.collidepoint(mouse_pos):
-            rx, ry = mouse_pos[0]-temp_rect.x, mouse_pos[1]-temp_rect.y
-            gc, gr = rx // GRID_SIZE, ry // GRID_SIZE
-            if 0 <= gr < self.grid_height and 0 <= gc < self.grid_width: return self.shape_matrix[gr][gc] == GridType.OCCUPIED
+        for r, row in enumerate(self.shape_matrix):
+            for c, cell in enumerate(row):
+                if cell == GridType.OCCUPIED:
+                    cell_rect = pygame.Rect(current_pos[0] + c*GRID_SIZE, current_pos[1] + r*GRID_SIZE, GRID_SIZE, GRID_SIZE)
+                    if cell_rect.collidepoint(mouse_pos):
+                        return True
         return False
         
     def rotate(self):
@@ -167,7 +167,7 @@ def is_placement_valid(item, gx, gy, items_dict):
 def game_loop():
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("Backpack Battles - Scalable UI")
+    pygame.display.set_caption("Backpack Battles - Final Bug Fixes")
     clock = pygame.time.Clock()
 
     items_in_shop = load_items_from_file('items.json')
@@ -209,21 +209,32 @@ def game_loop():
                     nr = selected_item.body_image.get_rect(x=mouse_pos[0]-npx_off, y=mouse_pos[1]-npy_off)
                     selected_item.rect, offset_x, offset_y = nr, nr.x-mouse_pos[0], nr.y-mouse_pos[1]
                 elif event.button == 1:
-                    clicked = False
-                    # BUG FIX: Use temporary rect for pickup check
-                    for pos, item in list(placed_items.items()):
-                        item_pos_on_screen = (BACKPACK_X+pos[0]*GRID_SIZE, BACKPACK_Y+pos[1]*GRID_SIZE)
+                    clicked_item_found = False
+                    # --- BUG FIX: Reworked Pickup Logic ---
+                    for pos, item in reversed(list(placed_items.items())):
+                        item_pos_on_screen = (BACKPACK_X + pos[0] * GRID_SIZE, BACKPACK_Y + pos[1] * GRID_SIZE)
                         if item.is_mouse_over_body(mouse_pos, item_pos_on_screen):
-                            selected_item, offset_x, offset_y = item, item_pos_on_screen[0]-mouse_pos[0], item_pos_on_screen[1]-mouse_pos[1]
-                            selected_item.dragging, selected_item.rect.topleft = True, item_pos_on_screen
-                            del placed_items[pos]; clicked = True; break
-                    if not clicked:
+                            selected_item = item
+                            offset_x = item_pos_on_screen[0] - mouse_pos[0]
+                            offset_y = item_pos_on_screen[1] - mouse_pos[1]
+                            selected_item.dragging = True
+                            selected_item.rect.topleft = item_pos_on_screen
+                            del placed_items[pos]
+                            clicked_item_found = True
+                            break 
+                    
+                    if not clicked_item_found:
                         for item_t in items_in_shop:
-                            if item_t.is_mouse_over_body(mouse_pos, item_t.rect.topleft):
+                            current_item_pos = item_t.rect.topleft
+                            if item_t.is_mouse_over_body(mouse_pos, current_item_pos):
                                 selected_item = Item(item_t.rect.x, item_t.rect.y, item_t.name, item_t.rarity, item_t.item_class, item_t.elements, item_t.types, item_t.shape_matrix)
                                 selected_item.dragging = True
-                                offset_x, offset_y = item_t.rect.x-mouse_pos[0], item_t.rect.y-mouse_pos[1]; break
-                    if calc_button.collidepoint(mouse_pos): engine.run(placed_items)
+                                offset_x, offset_y = item_t.rect.x - mouse_pos[0], item_t.rect.y - mouse_pos[1]
+                                break
+                    
+                    if calc_button.collidepoint(mouse_pos): 
+                        engine.run(placed_items)
+
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1 and selected_item:
                     selected_item.dragging = False
@@ -250,22 +261,25 @@ def game_loop():
             screen.blit(font_small.render(star_txt, True, (60,60,60)), (info_panel_rect.x+25, info_panel_rect.y+y_off+25-info_scroll_y))
             y_off += 60
         screen.set_clip(None)
-
-        # --- BUG FIX: Proper Drawing Order ---
-        # Pass 1: Draw all bodies
-        screen.set_clip(shop_area_rect)
-        for item in items_in_shop: item.rect.y = item.base_y - shop_scroll_y; screen.blit(item.body_image, item.rect)
-        screen.set_clip(None)
-        for (gx, gy), item in placed_items.items(): screen.blit(item.body_image, (BACKPACK_X+gx*GRID_SIZE, BACKPACK_Y+gy*GRID_SIZE))
         
-        # Pass 2: Draw all stars on hover
-        screen.set_clip(shop_area_rect)
+        # Create a combined list of all items to draw
+        all_items_to_draw = []
+        for pos, item in placed_items.items():
+            all_items_to_draw.append((item, (BACKPACK_X + pos[0] * GRID_SIZE, BACKPACK_Y + pos[1] * GRID_SIZE)))
         for item in items_in_shop:
-            if item.is_mouse_over_body(mouse_pos, item.rect.topleft): item.draw_stars(screen, item.rect.topleft)
-        screen.set_clip(None)
-        for (gx, gy), item in placed_items.items():
-            item_pos = (BACKPACK_X+gx*GRID_SIZE, BACKPACK_Y+gy*GRID_SIZE)
-            if item.is_mouse_over_body(mouse_pos, item_pos): item.draw_stars(screen, item_pos)
+            item.rect.y = item.base_y - shop_scroll_y
+            all_items_to_draw.append((item, item.rect.topleft))
+
+        # Pass 1: Draw all bodies
+        for item, pos in all_items_to_draw:
+            if shop_area_rect.colliderect(pygame.Rect(pos, item.body_image.get_size())) or info_panel_rect.x > pos[0]:
+                 screen.blit(item.body_image, pos)
+
+        # Pass 2: Draw stars for hovered items
+        for item, pos in all_items_to_draw:
+            if item.is_mouse_over_body(mouse_pos, pos):
+                if shop_area_rect.colliderect(pygame.Rect(pos, item.body_image.get_size())) or info_panel_rect.x > pos[0]:
+                    item.draw_stars(screen, pos)
         
         # Pass 3: Draw dragged item
         if selected_item and selected_item.dragging:

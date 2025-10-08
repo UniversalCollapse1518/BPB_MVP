@@ -13,13 +13,13 @@
   },
   "shield": {
     "name": "Shield",
-    "rarity": "RARE",
+    "rarity": "COMMON",
     "item_class": "NEUTRAL",
     "elements": [],
     "types": ["SHIELD"],
     "shape_matrix": [
-      [0, 3, 3, 0],
-      [1, 1, 1, 2]
+      [1, 1],
+      [1, 1]
     ]
   },
   "spear": {
@@ -29,7 +29,10 @@
     "elements": ["MELEE"],
     "types": ["WEAPON"],
     "shape_matrix": [
-      [1, 1, 1, 1, 2, 2, 2, 2, 2]
+      [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [1, 1, 1, 1, 2, 2, 2, 2, 2],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0]
+
     ]
   }
 }
