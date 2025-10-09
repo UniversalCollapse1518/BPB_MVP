@@ -1,71 +1,74 @@
-# **Backpack Battles \- MVP Simulator**
+# BPB_MVP: Backpack Battles Simulator & Editor
 
-This project is a minimal viable product (MVP) for a Backpack Battles simulator. The primary goal is to create a tool that allows users to place items within a backpack grid to visually simulate builds. The long-term vision is to develop a solver that can analyze item layouts and determine their combat effectiveness.
+This project is a tool designed to simulate and analyze item builds for the game Backpack Battles. It consists of two main parts: a simulator for manually placing items and a GUI editor for creating and managing item data.
 
-This repository contains the initial version with a basic GUI where items can be dragged and dropped into a backpack.
+## Features
 
-## **Features**
+- **Data-Driven Design:** All item properties, shapes, and star effects are loaded from an external `items.json` file, making the project highly extensible.
+- **Drag-and-Drop Simulator:** A Pygame-based interface to visually arrange items in a backpack.
+- **Complex Calculation Engine:** Automatically calculates item synergies, star activations, and a final score for the build based on data-driven rules.
+- **GUI Item Editor:** A user-friendly CustomTkinter application to create, view, edit, and delete items in the `items.json` database.
 
-* A visual backpack grid.  
-* Two sample items ("Sword" and "Shield") that can be selected.  
-* Drag-and-drop functionality for placing items.  
-* Items snap to the grid inside the backpack.
+## Project Structure
 
-## **Getting Started**
+The project is organized into several key files:
 
-Follow these instructions to get a copy of the project up and running on your local machine for development and testing purposes.
+- `definitions.py`: A shared file containing common Python Enums (like `Rarity`, `ItemClass`, `Element`, etc.) used by both the simulator and the editor.
+- `main.py`: The main Backpack Battles simulator application, built with Pygame.
+- `editor.py`: The GUI application for editing item data, built with CustomTkinter.
+- `items.json`: The central database for all item definitions.
+- `requirements.txt`: Contains all Python dependencies required for the project.
 
-### **Prerequisites**
+## Deployment Guide
 
-* [Python 3.8](https://www.python.org/downloads/) or newer  
-* [Git](https://git-scm.com/downloads/)
+Follow these steps to set up and run the project on your local machine.
 
-### **Installation Guide**
+### 1\. Initial Setup
 
-1. Clone the Repository  
-   Open your terminal or command prompt and clone the repository to your local machine:  
-   git clone \[https://github.com/BCSZSZ/BPB\_MVP.git\](https://github.com/BCSZSZ/BPB\_MVP.git)
+First, clone the repository and set up the Python virtual environment.
 
-2. **Navigate to the Project Directory**  
-   cd BPB\_MVP
+    # Navigate to your development folder
+    cd path/to/your/projects
 
-3. Create a Python Virtual Environment  
-   It's highly recommended to use a virtual environment to keep project dependencies isolated.  
-   ```python \-m venv venv```
+    # Clone the repository from GitHub
+    git clone [https://github.com/BCSZSZ/BPB_MVP.git](https://github.com/BCSZSZ/BPB_MVP.git)
 
-4. Activate the Virtual Environment  
-   You must activate the environment every time you work on the project.  
-   * **On Windows (Command Prompt):**  
-     ```venv\\Scripts\\activate```
+    # Navigate into the project folder
+    cd BPB_MVP
 
-   * On Windows (PowerShell):  
-     You may first need to adjust your script execution policy for the current session.  
-     ```Set-ExecutionPolicy \-ExecutionPolicy RemoteSigned \-Scope Process```
+    # Create a Python virtual environment
+    python -m venv venv
 
-     Then, you can activate the environment:  
-     ```venv\\Scripts\\activate```
+### 2\. Activate Environment & Install Dependencies
 
-   * **On macOS and Linux:**  
-     ```source venv/bin/activate```
+You must activate the virtual environment each time you want to work on the project.
 
-Your terminal prompt should now be prefixed with (venv).
+**On Windows:**
 
-5. Install Dependencies  
-   With the virtual environment active, install the necessary Python packages.  
-   ```pip install \-r requirements.txt```
+    # Activate the environment
+    venv\Scripts\activate
 
-## **Usage**
+    # Install all project dependencies
+    pip install -r requirements.txt
 
-Once the installation is complete, you can run the simulator with the following command:
+**On macOS / Linux:**
 
-```python main.py```
+    # Activate the environment
+    source venv/bin/activate
 
-A window should appear displaying the backpack grid and the draggable items.
+    # Install all project dependencies
+    pip install -r requirements.txt
 
-## **Contributing**
+### 3\. Running the Applications
 
-Contributions are welcome\! If you have ideas for improvements or want to fix a bug, please feel free to fork the repository and submit a pull request. For more details, see the CONTRIBUTING.md file.
+With the environment active and dependencies installed, you can run either the simulator or the editor.
 
-## **License**
+**To Run the Simulator:**
 
-This project is licensed under the MIT License \- see the [LICENSE](https://www.google.com/search?q=LICENSE) file for details.
+    python main.py
+
+**To Run the Item Editor:**
+
+    python editor.py
+
+This project is open-source and contributions are welcome. Please refer to `CONTRIBUTING.md` for more details.

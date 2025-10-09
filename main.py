@@ -4,6 +4,11 @@ import json
 from enum import Enum
 from typing import List, Optional, Dict, Tuple
 import math
+# --- NEW: Import for logging timestamp ---
+from datetime import datetime
+
+# --- MODIFICATION: Import from the new shared definitions file ---
+from definitions import GridType, Rarity, ItemClass, Element, ItemType
 
 # --- Constants ---
 SCREEN_WIDTH = 1200
@@ -22,13 +27,6 @@ PANEL_Y = 50
 PANEL_HEIGHT = 550 # Made shorter to accommodate total score panel
 INFO_PANEL_X, INFO_PANEL_WIDTH = PANEL_START_X, 350 # Made wider
 SHOP_X, SHOP_WIDTH = INFO_PANEL_X + INFO_PANEL_WIDTH + 20, 200
-
-# --- Enums for Item Properties ---
-class GridType(Enum): EMPTY, OCCUPIED, STAR_A, STAR_B, STAR_C = 0, 1, 2, 3, 4
-class Rarity(Enum): COMMON, RARE, EPIC, LEGENDARY, GODLY, UNIQUE = "Common", "Rare", "Epic", "Legendary", "Godly", "Unique"
-class ItemClass(Enum): NEUTRAL, RANGER, REAPER, BERSERKER, PYROMANCER, MAGE, ADVENTURER = "Neutral", "Ranger", "Reaper", "Berserker", "Pyromancer", "Mage", "Adventurer"
-class Element(Enum): MELEE, RANGED, EFFECT, NATURE, MAGIC, HOLY, DARK, VAMPIRIC, FIRE, ICE, TREASURE, MUSICAL = "Melee", "Ranged", "Effect", "Nature", "Magic", "Holy", "Dark", "Vampiric", "Fire", "Ice", "Treasure", "Musical"
-class ItemType(Enum): WEAPON, SHIELD, ACCESSORY, POTION, SPELL, FOOD, BOOK, PET = "Weapon", "Shield", "Accessory", "Potion", "Spell", "Food", "Book", "Pet"
 
 # --- Rarity and Star Colors ---
 RARITY_BORDER_COLORS = { Rarity.COMMON: (150, 150, 150), Rarity.RARE: (0, 100, 255), Rarity.EPIC: (138, 43, 226), Rarity.LEGENDARY: (255, 165, 0), Rarity.GODLY: (255, 215, 0), Rarity.UNIQUE: (255, 20, 147) }
@@ -101,7 +99,7 @@ class Item(pygame.sprite.Sprite):
         self.grid_height, self.grid_width = len(self.shape_matrix), len(self.shape_matrix[0])
         self.body_image = self.create_body_surface()
 
-# --- Calculation Engine (HEAVILY REWORKED) ---
+# --- Calculation Engine ---
 class CalculationEngine:
     def _check_condition(self, condition_data: dict, source_item: Item, target_item: Optional[Item]) -> bool:
         if condition_data.get("requires_empty", False): return target_item is None
@@ -124,7 +122,6 @@ class CalculationEngine:
         return final_value
 
     def run(self, placed_items: Dict[Tuple[int, int], Item]):
-        # Pass 1: Reset and build grid
         occupancy_grid: List[List[Optional[Item]]] = [[None for _ in range(BACKPACK_COLS)] for _ in range(BACKPACK_ROWS)]
         for item in placed_items.values():
             item.final_score, item.score_modifiers, item.occupying_stars = item.base_score, [], []
@@ -135,7 +132,6 @@ class CalculationEngine:
                     if cell == GridType.OCCUPIED and 0 <= gy+r < BACKPACK_ROWS and 0 <= gx+c < BACKPACK_COLS:
                         occupancy_grid[gy+r][gx+c] = item
 
-        # Pass 2: Count all star activations
         for (gx, gy), source_item in placed_items.items():
             triggered_by = {GridType.STAR_A: set(), GridType.STAR_B: set(), GridType.STAR_C: set()}
             for r, row in enumerate(source_item.shape_matrix):
@@ -153,7 +149,6 @@ class CalculationEngine:
                                     target_item.occupying_stars.append((cell_type, source_item.name))
                                     triggered_by[cell_type].add(target_item)
 
-        # Pass 3: Calculate and apply score effects
         all_effects = []
         for (gx, gy), source_item in placed_items.items():
              for r, row in enumerate(source_item.shape_matrix):
@@ -209,6 +204,14 @@ def is_placement_valid(item, gx, gy, items_dict):
                 if(ax,ay) in occupied_cells: return False
     return True
 
+# --- NEW: Logging Function ---
+def log_event(event_name: str, placed_items: Dict[Tuple[int, int], Item]):
+    """Formats and prints a log message for a mouse event."""
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+    # Create a simplified, readable version of the placed_items dictionary
+    placed_items_repr = {pos: item.name for pos, item in placed_items.items()}
+    print(f"[{timestamp}] - {event_name} - {placed_items_repr}")
+
 # --- Main Game Function ---
 def game_loop():
     pygame.init()
@@ -228,7 +231,6 @@ def game_loop():
     shop_scroll_y, info_scroll_y = 0, 0
     total_shop_height = sum(item.rect.height + 10 for item in items_in_shop) if items_in_shop else 0
     total_score = 0
-    # --- BUG FIX: Variable to track info panel content height ---
     info_content_height = 50 
     
     running = True
@@ -237,16 +239,19 @@ def game_loop():
         for event in pygame.event.get():
             if event.type == pygame.QUIT: running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
+                # --- LOGGING UPDATE ---
+                if event.button == 1: log_event("LEFT_CLICK_DOWN", placed_items)
+                if event.button == 3: log_event("RIGHT_CLICK_DOWN (Rotate)", placed_items)
+                if event.button == 4: log_event("SCROLL_UP", placed_items)
+                if event.button == 5: log_event("SCROLL_DOWN", placed_items)
+
                 if event.button == 4:
                     if shop_area_rect.collidepoint(mouse_pos): shop_scroll_y = max(0, shop_scroll_y - 20)
                     if info_panel_rect.collidepoint(mouse_pos): info_scroll_y = max(0, info_scroll_y - 20)
                 elif event.button == 5:
                     if shop_area_rect.collidepoint(mouse_pos):
-                        shop_scroll_y = min(max(0, total_shop_height - shop_area_rect.height), shop_scroll_y + 20)
-                    if info_panel_rect.collidepoint(mouse_pos):
-                        # --- BUG FIX: Use the tracked height for scrolling ---
-                        max_scroll = max(0, info_content_height - info_panel_rect.height)
-                        info_scroll_y = min(max_scroll, info_scroll_y + 20)
+                        info_h = 50 + sum(160 + len(i.score_modifiers)*20 + len(i.occupying_stars)*20 for i in placed_items.values())
+                        info_scroll_y = min(max(0, info_h - info_panel_rect.height), info_scroll_y + 20)
                 elif event.button == 3 and selected_item and selected_item.dragging:
                     rx, ry = mouse_pos[0]-selected_item.rect.x, mouse_pos[1]-selected_item.rect.y
                     pc, pr = rx // GRID_SIZE, ry // GRID_SIZE; ogh = selected_item.grid_height
@@ -255,14 +260,22 @@ def game_loop():
                     nr = selected_item.body_image.get_rect(x=mouse_pos[0]-npx, y=mouse_pos[1]-npy)
                     selected_item.rect, offset_x, offset_y = nr, nr.x-mouse_pos[0], nr.y-mouse_pos[1]
                 elif event.button == 1:
-                    clicked = False
+                    item_to_pick_info = None
                     for pos, item in reversed(list(placed_items.items())):
-                        item_pos = (BACKPACK_X+pos[0]*GRID_SIZE, BACKPACK_Y+pos[1]*GRID_SIZE)
-                        if item.is_mouse_over_body(mouse_pos, item_pos):
-                            selected_item, offset_x, offset_y = item, item_pos[0]-mouse_pos[0], item_pos[1]-mouse_pos[1]
-                            selected_item.dragging, selected_item.rect.topleft = True, item_pos
-                            del placed_items[pos]; clicked=True; break
-                    if not clicked:
+                        item_pos_on_screen = (BACKPACK_X + pos[0] * GRID_SIZE, BACKPACK_Y + pos[1] * GRID_SIZE)
+                        if item.is_mouse_over_body(mouse_pos, item_pos_on_screen):
+                            item_to_pick_info = (pos, item)
+                            break 
+                    if item_to_pick_info:
+                        pos, item = item_to_pick_info
+                        selected_item = item
+                        item_pos_on_screen = (BACKPACK_X + pos[0] * GRID_SIZE, BACKPACK_Y + pos[1] * GRID_SIZE)
+                        offset_x = item_pos_on_screen[0] - mouse_pos[0]
+                        offset_y = item_pos_on_screen[1] - mouse_pos[1]
+                        selected_item.dragging = True
+                        selected_item.rect.topleft = item_pos_on_screen
+                        del placed_items[pos]
+                    else:
                         for item_t in items_in_shop:
                             if item_t.is_mouse_over_body(mouse_pos, item_t.rect.topleft):
                                 selected_item = Item(item_t.rect.x, item_t.rect.y, item_t.name, item_t.rarity, item_t.item_class, item_t.elements, item_t.types, item_t.shape_matrix, item_t.base_score, item_t.star_effects)
@@ -270,15 +283,14 @@ def game_loop():
                     if calc_button.collidepoint(mouse_pos): 
                         engine.run(placed_items)
                         total_score = sum(item.final_score for item in placed_items.values())
-                        # --- BUG FIX: Recalculate content height after calculation ---
                         info_content_height = 45
                         for item in placed_items.values():
-                            height_per_item = 25 + 20 + 25 + 20 # name, elem, type, activated
+                            height_per_item = 25 + 20 + 25 + 20
                             if item.occupying_stars: height_per_item += 20 + (len(item.occupying_stars) * 20)
                             height_per_item += 20 + (len(item.score_modifiers) * 20) + 25 + 15
                             info_content_height += height_per_item
-
             elif event.type == pygame.MOUSEBUTTONUP:
+                log_event("MOUSEBUTTONUP", placed_items) # Log event
                 if event.button == 1 and selected_item:
                     selected_item.dragging = False
                     gx, gy = round((selected_item.rect.left-BACKPACK_X)/GRID_SIZE), round((selected_item.rect.top-BACKPACK_Y)/GRID_SIZE)
@@ -291,7 +303,6 @@ def game_loop():
         screen.fill(BG_COLOR)
         bp_rect = pygame.Rect(BACKPACK_X, BACKPACK_Y, BACKPACK_COLS*GRID_SIZE, BACKPACK_ROWS*GRID_SIZE)
         pygame.draw.rect(screen, (230,230,230), bp_rect); pygame.draw.rect(screen, (240,240,240), shop_area_rect, 2); 
-        # --- BUG FIX: Draw total score panel separately ---
         total_score_rect = pygame.Rect(info_panel_rect.left, info_panel_rect.bottom, info_panel_rect.width, 50)
         pygame.draw.rect(screen, (210, 210, 210), total_score_rect)
         pygame.draw.rect(screen, (180, 180, 180), total_score_rect, 2)
@@ -317,10 +328,8 @@ def game_loop():
             for mod in item.score_modifiers: screen.blit(font_small.render(f"  {mod}", True, (20,100,20)), (info_panel_rect.x+25, info_panel_rect.y+y_off-info_scroll_y)); y_off += 20
             screen.blit(font_medium.render(f"Final Score: {item.final_score:.1f}", True, FONT_COLOR), (info_panel_rect.x+25, info_panel_rect.y+y_off-info_scroll_y)); y_off += 25
             y_off += 15
-        
         screen.set_clip(None)
         
-        # --- BUG FIX: Draw Total Score in its own static panel ---
         total_score_text = f"Total Score: {total_score:.1f}"
         screen.blit(font_large.render(total_score_text, True, FONT_COLOR), (total_score_rect.x + 10, total_score_rect.centery - 16))
 
