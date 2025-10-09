@@ -239,17 +239,18 @@ def game_loop():
         for event in pygame.event.get():
             if event.type == pygame.QUIT: running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                # --- LOGGING UPDATE ---
-                if event.button == 1: log_event("LEFT_CLICK_DOWN", placed_items)
-                if event.button == 3: log_event("RIGHT_CLICK_DOWN (Rotate)", placed_items)
                 if event.button == 4: log_event("SCROLL_UP", placed_items)
-                if event.button == 5: log_event("SCROLL_DOWN", placed_items)
+                elif event.button == 5: log_event("SCROLL_DOWN", placed_items)
+                elif event.button == 3: log_event("RIGHT_CLICK (Rotate)", placed_items)
+                elif event.button == 1: log_event("LEFT_CLICK_DOWN", placed_items)
 
                 if event.button == 4:
                     if shop_area_rect.collidepoint(mouse_pos): shop_scroll_y = max(0, shop_scroll_y - 20)
                     if info_panel_rect.collidepoint(mouse_pos): info_scroll_y = max(0, info_scroll_y - 20)
                 elif event.button == 5:
                     if shop_area_rect.collidepoint(mouse_pos):
+                        shop_scroll_y = min(max(0, total_shop_height - shop_area_rect.height), shop_scroll_y + 20)
+                    if info_panel_rect.collidepoint(mouse_pos):
                         info_h = 50 + sum(160 + len(i.score_modifiers)*20 + len(i.occupying_stars)*20 for i in placed_items.values())
                         info_scroll_y = min(max(0, info_h - info_panel_rect.height), info_scroll_y + 20)
                 elif event.button == 3 and selected_item and selected_item.dragging:
@@ -274,7 +275,10 @@ def game_loop():
                         offset_y = item_pos_on_screen[1] - mouse_pos[1]
                         selected_item.dragging = True
                         selected_item.rect.topleft = item_pos_on_screen
+                        # --- LOGGING UPDATE ---
+                        log_event("BEFORE_DELETE", placed_items)
                         del placed_items[pos]
+                        log_event("AFTER_DELETE", placed_items)
                     else:
                         for item_t in items_in_shop:
                             if item_t.is_mouse_over_body(mouse_pos, item_t.rect.topleft):
@@ -297,6 +301,7 @@ def game_loop():
                     if is_placement_valid(selected_item, gx, gy, placed_items): placed_items[(gx, gy)] = selected_item
                     selected_item = None
             elif event.type == pygame.MOUSEMOTION:
+                # MOUSEMOTION log removed as requested
                 if selected_item and selected_item.dragging:
                     selected_item.rect.x, selected_item.rect.y = mouse_pos[0]+offset_x, mouse_pos[1]+offset_y
         
