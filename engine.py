@@ -188,28 +188,40 @@ class CalculationEngine:
                         value = self._get_effect_value(effect_data, source_item)
                         all_effects.append({"source": source_item, "target": target_item, "effect": effect_data["effect"], "value": value})
 
+            # BUG FIX: Initialize a tracker for each source_item to ensure star effects
+            # are applied only once per unique target item, per star type.
+            triggered_targets = {GridType.STAR_A: set(), GridType.STAR_B: set(), GridType.STAR_C: set()}
             gx, gy = source_item.gx, source_item.gy
             for r, row in enumerate(source_item.shape_matrix):
                 for c, cell_type in enumerate(row):
-                    if cell_type.name.startswith("STAR"):
+                    if cell_type in triggered_targets: # A more direct way to check if it's a star
+                        abs_x, abs_y = gx + c, gy + r
+                        target_item = occupancy_grid[abs_y][abs_x] if 0 <= abs_y < backpack_rows and 0 <= abs_x < backpack_cols else None
+
+                        # Check if this specific target has already triggered this star type.
+                        # This handles both items and the `None` case (if None is already in the set).
+                        if target_item in triggered_targets[cell_type]:
+                            continue
+                        
                         base_star_name = cell_type.name
-                        triggered_by_effect = set()
+                        effect_applied_for_this_cell = False
                         for star_key in source_item.star_effects:
                             if star_key.startswith(base_star_name):
                                 effects = source_item.star_effects[star_key]
                                 if not isinstance(effects, list): effects = [effects]
 
-                                abs_x, abs_y = gx + c, gy + r
-                                target_item = occupancy_grid[abs_y][abs_x] if 0 <= abs_y < backpack_rows and 0 <= abs_x < backpack_cols else None
-                                
                                 for effect_data in effects:
                                     if self._check_condition(effect_data.get("condition", {}), source_item, target_item):
-                                        if (star_key, target_item) not in triggered_by_effect:
-                                            if "effect" in effect_data and "SCORE" in effect_data["effect"]:
-                                                value = self._get_effect_value(effect_data, source_item)
-                                                all_effects.append({"source": source_item, "target": target_item, "effect": effect_data["effect"], "value": value})
-                                                triggered_by_effect.add((star_key, target_item))
-                                            break
+                                        if "effect" in effect_data and "SCORE" in effect_data["effect"]:
+                                            value = self._get_effect_value(effect_data, source_item)
+                                            all_effects.append({"source": source_item, "target": target_item, "effect": effect_data["effect"], "value": value})
+                                        
+                                        # It's a valid trigger, so record the target and stop processing this cell
+                                        triggered_targets[cell_type].add(target_item)
+                                        effect_applied_for_this_cell = True
+                                        break # Exit effect_data loop
+                                if effect_applied_for_this_cell:
+                                    break # Exit star_key loop
         
         for effect_type in ["ADD_SCORE_TO_SELF", "ADD_SCORE_TO_TARGET"]:
             for eff in all_effects:
@@ -222,4 +234,3 @@ class CalculationEngine:
                 if eff["effect"] == effect_type:
                     if eff["effect"] == "MULTIPLY_SCORE_OF_SELF": eff["source"].final_score *= eff["value"]; eff["source"].score_modifiers.append(f"x{eff['value']:.2f} (self)")
                     elif eff["target"]: eff["target"].final_score *= eff["value"]; eff["target"].score_modifiers.append(f"x{eff['value']:.2f} from {eff['source'].name}")
-
