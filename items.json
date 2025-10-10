@@ -215,8 +215,9 @@
         {
           "effect": "ADD_SCORE_TO_SELF",
           "value": 3,
+          "condition_logic": "OR",
           "condition": {
-            "requires_empty": "",
+            "requires_empty": true,
             "requires_element": "NATURE"
           }
         }

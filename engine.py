@@ -91,40 +91,57 @@ class Item(pygame.sprite.Sprite):
         self.body_image = self.create_body_surface(GRID_SIZE, RARITY_BORDER_COLORS, FONT_COLOR)
 
 class CalculationEngine:
-    def _check_condition(self, condition_data: dict, source_item: Item, target_item: Optional[Item]) -> bool:
-        if condition_data.get("requires_empty", False): return target_item is None
-        if target_item is None: return False
-        
-        if "requires_element" in condition_data:
-            required_elements = condition_data["requires_element"]
-            if not isinstance(required_elements, list):
-                required_elements = [required_elements]
+    def _check_condition(self, condition_data: dict, source_item: Item, target_item: Optional[Item], condition_logic: str = "AND") -> bool:
+        if not condition_data:
+            return True
+
+        check_results = []
+
+        if "requires_empty" in condition_data:
+            if condition_data["requires_empty"]:
+                check_results.append(target_item is None)
+
+        if target_item is not None:
+            if "requires_element" in condition_data:
+                reqs = condition_data["requires_element"]
+                if not isinstance(reqs, list): reqs = [reqs]
+                target_elems = set(target_item.elements + target_item.temporary_elements)
+                check_results.append(any(Element[req] in target_elems for req in reqs))
+
+            if "requires_type" in condition_data:
+                reqs = condition_data["requires_type"]
+                if not isinstance(reqs, list): reqs = [reqs]
+                check_results.append(any(ItemType[req] in target_item.types for req in reqs))
             
-            target_elements = set(target_item.elements + target_item.temporary_elements)
-            if not any(Element[req] in target_elements for req in required_elements):
-                return False
+            if "requires_name" in condition_data:
+                reqs = condition_data["requires_name"]
+                if not isinstance(reqs, list): reqs = [reqs]
+                check_results.append(target_item.name in reqs)
 
-        if "requires_type" in condition_data:
-            required_types = condition_data["requires_type"]
-            if not isinstance(required_types, list):
-                required_types = [required_types]
+            if "must_be_different" in condition_data:
+                if condition_data["must_be_different"]:
+                    check_results.append(source_item.name != target_item.name)
 
-            if not any(ItemType[req] in target_item.types for req in required_types):
-                return False
+            if "requires_cooldown" in condition_data:
+                if condition_data["requires_cooldown"]:
+                    check_results.append(getattr(target_item, 'has_cooldown', False))
 
-        if "requires_name" in condition_data:
-            required_names = condition_data["requires_name"]
-            if not isinstance(required_names, list):
-                required_names = [required_names]
-            
-            if target_item.name not in required_names:
-                return False
-
-        if condition_data.get("must_be_different", False) and source_item.name == target_item.name: return False
-        if condition_data.get("requires_cooldown", False) and not getattr(target_item, 'has_cooldown', False): return False
-        if condition_data.get("requires_start_of_battle", False) and not getattr(target_item, 'is_start_of_battle', False): return False
+            if "requires_start_of_battle" in condition_data:
+                if condition_data["requires_start_of_battle"]:
+                    check_results.append(getattr(target_item, 'is_start_of_battle', False))
         
-        return True
+        else:
+            for key in condition_data:
+                if key != "requires_empty":
+                    check_results.append(False)
+
+        if not check_results:
+            return True
+
+        if condition_logic == "OR":
+            return any(check_results)
+        else:
+            return all(check_results)
 
     def _get_effect_value(self, effect_data: dict, source_item: Item) -> Any:
         value_data = effect_data.get("value", 0)
@@ -167,7 +184,8 @@ class CalculationEngine:
                                 target_item = occupancy_grid[abs_y][abs_x] if 0 <= abs_y < backpack_rows and 0 <= abs_x < backpack_cols else None
                                 
                                 for effect_data in effects:
-                                    if effect_data.get("effect") == "ADD_ELEMENT_TO_TARGET" and self._check_condition(effect_data.get("condition", {}), source_item, target_item):
+                                    logic = effect_data.get("condition_logic", "AND")
+                                    if effect_data.get("effect") == "ADD_ELEMENT_TO_TARGET" and self._check_condition(effect_data.get("condition", {}), source_item, target_item, logic):
                                         if target_item:
                                             element_to_add = Element[effect_data["value"]]
                                             if element_to_add not in target_item.temporary_elements:
@@ -190,7 +208,8 @@ class CalculationEngine:
                                 target_item = occupancy_grid[abs_y][abs_x] if 0 <= abs_y < backpack_rows and 0 <= abs_x < backpack_cols else None
                                 
                                 for effect_data in effects:
-                                    if self._check_condition(effect_data.get("condition", {}), source_item, target_item):
+                                    logic = effect_data.get("condition_logic", "AND")
+                                    if self._check_condition(effect_data.get("condition", {}), source_item, target_item, logic):
                                         if target_item is None or target_item not in triggered_by.get(cell_type, set()):
                                             source_item.activated_stars[cell_type] += 1
                                             if target_item:
@@ -203,10 +222,10 @@ class CalculationEngine:
         for source_item in placed_items.values():
             for effect_data in source_item.passive_effects:
                 for target_item in placed_items.values():
-                    if self._check_condition(effect_data.get("condition", {}), source_item, target_item):
+                    logic = effect_data.get("condition_logic", "AND")
+                    if self._check_condition(effect_data.get("condition", {}), source_item, target_item, logic):
                         value = self._get_effect_value(effect_data, source_item)
-                        # QoL CHANGE: Add a 'reason' for the effect
-                        reason = f"Passive from {target_item.name}"
+                        reason = f"Passive from {target_item.name}" if target_item else "Passive"
                         all_effects.append({"source": source_item, "target": target_item, "effect": effect_data["effect"], "value": value, "reason": reason})
 
             triggered_targets = {GridType.STAR_A: set(), GridType.STAR_B: set(), GridType.STAR_C: set()}
@@ -217,7 +236,13 @@ class CalculationEngine:
                         abs_x, abs_y = gx + c, gy + r
                         target_item = occupancy_grid[abs_y][abs_x] if 0 <= abs_y < backpack_rows and 0 <= abs_x < backpack_cols else None
 
-                        if target_item in triggered_targets[cell_type]:
+                        # --- MODIFIED: Only check for duplicates if the target is an item ---
+                        is_duplicate = False
+                        if target_item is not None:
+                            if target_item in triggered_targets[cell_type]:
+                                is_duplicate = True
+                        
+                        if is_duplicate:
                             continue
                         
                         base_star_name = cell_type.name
@@ -228,14 +253,17 @@ class CalculationEngine:
                                 if not isinstance(effects, list): effects = [effects]
 
                                 for effect_data in effects:
-                                    if self._check_condition(effect_data.get("condition", {}), source_item, target_item):
+                                    logic = effect_data.get("condition_logic", "AND")
+                                    if self._check_condition(effect_data.get("condition", {}), source_item, target_item, logic):
                                         if "effect" in effect_data and "SCORE" in effect_data["effect"]:
                                             value = self._get_effect_value(effect_data, source_item)
-                                            # QoL CHANGE: Add a 'reason' for the effect
                                             reason = f"Star {cell_type.name.split('_')[1]}"
                                             all_effects.append({"source": source_item, "target": target_item, "effect": effect_data["effect"], "value": value, "reason": reason})
                                         
-                                        triggered_targets[cell_type].add(target_item)
+                                        # --- MODIFIED: Only track duplicates if the target was an item ---
+                                        if target_item is not None:
+                                            triggered_targets[cell_type].add(target_item)
+                                            
                                         effect_applied_for_this_cell = True
                                         break
                                 if effect_applied_for_this_cell:
@@ -244,7 +272,6 @@ class CalculationEngine:
         for effect_type in ["ADD_SCORE_TO_SELF", "ADD_SCORE_TO_TARGET"]:
             for eff in all_effects:
                 if eff["effect"] == effect_type:
-                    # QoL CHANGE: Use the 'reason' to create a more descriptive modifier string
                     if eff["effect"] == "ADD_SCORE_TO_SELF":
                         reason_text = eff.get("reason", "self")
                         eff["source"].final_score += eff["value"]
@@ -256,7 +283,6 @@ class CalculationEngine:
         for effect_type in ["MULTIPLY_SCORE_OF_SELF", "MULTIPLY_SCORE_OF_TARGET"]:
             for eff in all_effects:
                 if eff["effect"] == effect_type:
-                    # QoL CHANGE: Use the 'reason' to create a more descriptive modifier string
                     if eff["effect"] == "MULTIPLY_SCORE_OF_SELF":
                         reason_text = eff.get("reason", "self")
                         eff["source"].final_score *= eff["value"]

@@ -8,6 +8,7 @@ GRID_COLS, GRID_ROWS = 9, 7
 GRID_COLORS = {-1: "#2B2B2B", 0:"#343638", 1:"#A9A9A9", 2:"#FFD700", 3:"#32CD32", 4:"#9400D3"}
 BRUSH_NAMES = {-1: "NULL", 0: "EMPTY", 1: "BODY", 2: "STAR A", 3: "STAR B", 4: "STAR C"}
 STAR_EFFECT_KEYS = ["STAR_A_1", "STAR_A_2", "STAR_B_1", "STAR_B_2", "STAR_C_1", "STAR_C_2"]
+LOGIC_OPTIONS = ["Match All (AND)", "Match Any (OR)"]
 
 class ItemEditorApp(ctk.CTk):
     def __init__(self):
@@ -127,8 +128,8 @@ class ItemEditorApp(ctk.CTk):
         
         control_frame = ctk.CTkFrame(effect_frame, fg_color="transparent")
         control_frame.grid(row=0, column=2, padx=5, pady=5, sticky="ne")
-        ctk.CTkButton(control_frame, text="↑", width=25, command=lambda f=effect_frame, p=parent, d="up": self._move_effect(p, f, d)).pack(side="left")
-        ctk.CTkButton(control_frame, text="↓", width=25, command=lambda f=effect_frame, p=parent, d="down": self._move_effect(p, f, d)).pack(side="left", padx=2)
+        ctk.CTkButton(control_frame, text="↑", width=25, command=lambda f=effect_frame, p=parent: self._move_effect(p, f, "up")).pack(side="left")
+        ctk.CTkButton(control_frame, text="↓", width=25, command=lambda f=effect_frame, p=parent: self._move_effect(p, f, "down")).pack(side="left", padx=2)
         ctk.CTkButton(control_frame, text="X", width=25, command=lambda f=effect_frame: self._remove_effect_frame(f, key)).pack(side="left")
         
         ctk.CTkLabel(effect_frame, text="Effect Type:").grid(row=0, column=0, padx=5, pady=2, sticky="w")
@@ -140,12 +141,19 @@ class ItemEditorApp(ctk.CTk):
         value_entry.grid(row=1, column=1, padx=5, pady=2, sticky="ew")
         if effect_data and 'value' in effect_data: value_entry.insert(0, str(effect_data['value']))
 
+        # --- NEW: Condition Logic Dropdown ---
+        ctk.CTkLabel(effect_frame, text="Condition Logic:").grid(row=2, column=0, padx=5, pady=2, sticky="w")
+        logic_var = ctk.StringVar(value=LOGIC_OPTIONS[0])
+        if effect_data and effect_data.get("condition_logic", "AND") == "OR":
+            logic_var.set(LOGIC_OPTIONS[1])
+        ctk.CTkOptionMenu(effect_frame, variable=logic_var, values=LOGIC_OPTIONS).grid(row=2, column=1, padx=5, pady=2, sticky="w")
+
         conditions_frame = ctk.CTkFrame(effect_frame, fg_color="transparent")
-        conditions_frame.grid(row=2, column=0, columnspan=3, sticky="ew", padx=5, pady=5)
+        conditions_frame.grid(row=3, column=0, columnspan=3, sticky="ew", padx=5, pady=5)
         ctk.CTkLabel(conditions_frame, text="Conditions:").pack(anchor="w")
         ctk.CTkButton(conditions_frame, text="+ Add Condition", height=20, command=lambda p=conditions_frame: self._add_condition_row(p)).pack(anchor="w", pady=2)
         
-        effect_frame.widgets = {'effect_type': effect_type_var, 'value': value_entry, 'conditions': []}
+        effect_frame.widgets = {'effect_type': effect_type_var, 'value': value_entry, 'logic': logic_var, 'conditions': []}
         if effect_data and "condition" in effect_data:
             for k, v in effect_data["condition"].items():
                 self._add_condition_row(conditions_frame, {"type": k, "value": v})
@@ -158,7 +166,7 @@ class ItemEditorApp(ctk.CTk):
         frame_to_remove.destroy()
 
     def _move_effect(self, parent, frame_to_move, direction):
-        children = [child for child in parent.winfo_children() if isinstance(child, ctk.CTkFrame)]
+        children = list(parent.pack_slaves())
         if frame_to_move not in children: return
 
         current_index = children.index(frame_to_move)
@@ -167,7 +175,7 @@ class ItemEditorApp(ctk.CTk):
         if 0 <= new_index < len(children):
             children.pop(current_index)
             children.insert(new_index, frame_to_move)
-            for child in children: child.pack_forget()
+            for child in parent.pack_slaves(): child.pack_forget()
             for child in children: child.pack(pady=5, padx=5, fill="x", expand=True)
 
     def _add_condition_row(self, parent, condition_data=None):
@@ -286,19 +294,20 @@ class ItemEditorApp(ctk.CTk):
         for key in all_effect_keys:
             effect_list = []
             scroll_frame = self.effect_widgets[key]['scroll_frame']
-            # BUG FIX: Use pack_slaves() to get widgets in their visual order, not creation order.
             for w in scroll_frame.pack_slaves():
                 if isinstance(w, ctk.CTkFrame) and hasattr(w, 'widgets'):
                     value_str = w.widgets['value'].get()
                     try: value = eval(value_str)
                     except (NameError, SyntaxError): value = value_str
-
-                    effect_data = {"effect": w.widgets['effect_type'].get(), "value": value, "condition": {}}
+                    
+                    logic_str = "AND" if w.widgets['logic'].get() == LOGIC_OPTIONS[0] else "OR"
+                    effect_data = {"effect": w.widgets['effect_type'].get(), "value": value, "condition_logic": logic_str, "condition": {}}
+                    
                     for cond in w.widgets['conditions']:
                         if cond['frame'].winfo_exists():
-                            cond_type = cond['type'].get(); cond_val = cond['value'].get()
-                            try: cond_val = eval(cond_val)
-                            except (NameError, SyntaxError): pass 
+                            cond_type = cond['type'].get(); cond_val_str = cond['value'].get()
+                            try: cond_val = eval(cond_val_str)
+                            except (NameError, SyntaxError): cond_val = cond_val_str
                             effect_data["condition"][cond_type] = cond_val
                     effect_list.append(effect_data)
 
@@ -342,4 +351,3 @@ class ItemEditorApp(ctk.CTk):
 if __name__ == "__main__":
     app = ItemEditorApp()
     app.mainloop()
-
