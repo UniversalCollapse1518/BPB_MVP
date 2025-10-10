@@ -1,13 +1,11 @@
 import pygame
 import sys
 import json
-from enum import Enum
-from typing import List, Optional, Dict, Tuple
-import math
-from datetime import datetime
+from typing import List, Dict, Tuple
 import copy
 
 from definitions import GridType, Rarity, ItemClass, Element, ItemType
+from engine import Item, CalculationEngine
 
 SCREEN_WIDTH = 1200
 SCREEN_HEIGHT = 700
@@ -24,167 +22,8 @@ BG_COLOR = (255, 255, 255)
 FONT_COLOR = (10, 10, 10)
 GRID_LINE_COLOR = (200, 200, 200)
 INVALID_PLACEMENT_COLOR = (255, 0, 0, 100)
-
-RARITY_BORDER_COLORS = {
-    Rarity.COMMON: (150, 150, 150), Rarity.RARE: (0, 100, 255), Rarity.EPIC: (138, 43, 226),
-    Rarity.LEGENDARY: (255, 165, 0), Rarity.GODLY: (255, 215, 0), Rarity.UNIQUE: (255, 20, 147)
-}
-STAR_SHAPE_COLORS = {
-    GridType.STAR_A: (255, 215, 0), GridType.STAR_B: (50, 205, 50), GridType.STAR_C: (148, 0, 211)
-}
-
-class Item(pygame.sprite.Sprite):
-    def __init__(self, x: int, y: int, name: str, rarity: Rarity,
-                 item_class: ItemClass, elements: List[Element], types: List[ItemType],
-                 shape_matrix: List[List[GridType]], base_score: int, star_effects: dict):
-        super().__init__()
-        self.name = name
-        self.rarity = rarity
-        self.item_class = item_class
-        self.elements = elements
-        self.types = types
-        self.shape_matrix = shape_matrix
-        self.base_score = base_score
-        self.star_effects = star_effects
-
-        self.grid_width = len(shape_matrix[0]) if shape_matrix else 0
-        self.grid_height = len(shape_matrix)
-        self.body_image = self.create_body_surface()
-        self.rect = self.body_image.get_rect(topleft=(x, y))
-        self.base_y = y
-        self.dragging = False
-
-        self.gx = -1
-        self.gy = -1
-
-        self.final_score = 0
-        self.score_modifiers = []
-        self.activated_stars = {GridType.STAR_A: 0, GridType.STAR_B: 0, GridType.STAR_C: 0}
-        self.occupying_stars = []
-
-    def get_body_offset(self) -> Tuple[int, int]:
-        for r, row in enumerate(self.shape_matrix):
-            for c, cell in enumerate(row):
-                if cell == GridType.OCCUPIED:
-                    return (c, r)
-        return (0, 0)
-
-    def create_body_surface(self) -> pygame.Surface:
-        width_px, height_px = self.grid_width * GRID_SIZE, self.grid_height * GRID_SIZE
-        surface = pygame.Surface((width_px, height_px), pygame.SRCALPHA)
-        occupied_coords = [(c, r) for r, row in enumerate(self.shape_matrix) for c, cell in enumerate(row) if cell == GridType.OCCUPIED]
-        if occupied_coords:
-            for c, r in occupied_coords:
-                pygame.draw.rect(surface, (200, 200, 200), (c * GRID_SIZE, r * GRID_SIZE, GRID_SIZE, GRID_SIZE))
-                pygame.draw.rect(surface, RARITY_BORDER_COLORS[self.rarity], (c * GRID_SIZE, r * GRID_SIZE, GRID_SIZE, GRID_SIZE), 2)
-            min_c, max_c = min(c for c,r in occupied_coords), max(c for c,r in occupied_coords)
-            min_r, max_r = min(r for c,r in occupied_coords), max(r for c,r in occupied_coords)
-            center_x, center_y = (min_c + max_c + 1) * GRID_SIZE / 2, (min_r + max_r + 1) * GRID_SIZE / 2
-            font = pygame.font.SysFont(None, 20)
-            name_text = (self.name[:4] + '..') if len(self.name) > 6 else self.name
-            text_surf = font.render(name_text, True, FONT_COLOR)
-            surface.blit(text_surf, text_surf.get_rect(center=(center_x, center_y)))
-        return surface
-
-    def draw_stars(self, screen: pygame.Surface, top_left_pos: Tuple[int, int]):
-        for r, row in enumerate(self.shape_matrix):
-            for c, cell in enumerate(row):
-                if cell in STAR_SHAPE_COLORS:
-                    cx, cy = top_left_pos[0] + c*GRID_SIZE + GRID_SIZE//2, top_left_pos[1] + r*GRID_SIZE + GRID_SIZE//2
-                    color = STAR_SHAPE_COLORS[cell]
-                    if cell == GridType.STAR_A:
-                        pts = [(cx + (GRID_SIZE/2 if a==18 else GRID_SIZE/4)*math.cos(math.radians(a+i*72)), cy + (GRID_SIZE/2 if a==18 else GRID_SIZE/4)*math.sin(math.radians(a+i*72))) for i in range(5) for a in [18,54]]
-                        pygame.draw.polygon(screen, color, pts)
-                    elif cell == GridType.STAR_B: pygame.draw.polygon(screen, color, [(cx,cy-GRID_SIZE*0.4),(cx+GRID_SIZE*0.4,cy),(cx,cy+GRID_SIZE*0.4),(cx-GRID_SIZE*0.4,cy)])
-                    elif cell == GridType.STAR_C: pygame.draw.polygon(screen, color, [(cx,cy-GRID_SIZE*0.35),(cx-GRID_SIZE*0.35,cy+GRID_SIZE*0.35),(cx+GRID_SIZE*0.35,cy+GRID_SIZE*0.35)])
-
-    def is_mouse_over_body(self, mouse_pos: Tuple[int, int], current_pos: Tuple[int, int]) -> bool:
-        for r, row in enumerate(self.shape_matrix):
-            for c, cell in enumerate(row):
-                if cell == GridType.OCCUPIED and pygame.Rect(current_pos[0]+c*GRID_SIZE, current_pos[1]+r*GRID_SIZE, GRID_SIZE, GRID_SIZE).collidepoint(mouse_pos):
-                    return True
-        return False
-        
-    def rotate(self):
-        self.shape_matrix = [list(row)[::-1] for row in zip(*self.shape_matrix)]
-        self.grid_height, self.grid_width = len(self.shape_matrix), len(self.shape_matrix[0])
-        self.body_image = self.create_body_surface()
-
-class CalculationEngine:
-    def _check_condition(self, condition_data: dict, source_item: Item, target_item: Optional[Item]) -> bool:
-        if condition_data.get("requires_empty", False): return target_item is None
-        if target_item is None: return False
-        if "requires_element" in condition_data and Element[condition_data["requires_element"]] not in target_item.elements: return False
-        if "requires_type" in condition_data and ItemType[condition_data["requires_type"]] not in target_item.types: return False
-        if condition_data.get("must_be_different", False) and source_item.name == target_item.name: return False
-        return True
-
-    def _get_effect_value(self, effect_data: dict, source_item: Item) -> float:
-        value_data = effect_data.get("value", 0)
-        if isinstance(value_data, (int, float)): return value_data
-        final_value = value_data.get("base", 0.0)
-        if "dynamic_bonus" in value_data:
-            bonus_data = value_data["dynamic_bonus"]
-            per_star_type = GridType[bonus_data["per_activated_star"]]
-            num_activated = source_item.activated_stars.get(per_star_type, 0)
-            final_value += num_activated * bonus_data.get("add", 0)
-        return final_value
-
-    def run(self, placed_items: Dict[Tuple[int, int], Item]):
-        occupancy_grid: List[List[Optional[Item]]] = [[None for _ in range(BACKPACK_COLS)] for _ in range(BACKPACK_ROWS)]
-        for item in placed_items.values():
-            item.final_score, item.score_modifiers, item.occupying_stars = item.base_score, [], []
-            item.activated_stars = {GridType.STAR_A: 0, GridType.STAR_B: 0, GridType.STAR_C: 0}
-        
-        for item in placed_items.values():
-            gx, gy = item.gx, item.gy
-            for r, row in enumerate(item.shape_matrix):
-                for c, cell in enumerate(row):
-                    if cell == GridType.OCCUPIED and 0 <= gy+r < BACKPACK_ROWS and 0 <= gx+c < BACKPACK_COLS:
-                        occupancy_grid[gy+r][gx+c] = item
-
-        for source_item in placed_items.values():
-            gx, gy = source_item.gx, source_item.gy
-            triggered_by = {GridType.STAR_A: set(), GridType.STAR_B: set(), GridType.STAR_C: set()}
-            for r, row in enumerate(source_item.shape_matrix):
-                for c, cell_type in enumerate(row):
-                    if cell_type in triggered_by and (cell_type.name in source_item.star_effects):
-                        abs_x, abs_y = gx + c, gy + r
-                        target_item = occupancy_grid[abs_y][abs_x] if 0 <= abs_y < BACKPACK_ROWS and 0 <= abs_x < BACKPACK_COLS else None
-                        effect_data = source_item.star_effects[cell_type.name]
-                        conditions = effect_data.get("conditions", [effect_data.get("condition", {})])
-                        if any(self._check_condition(cond, source_item, target_item) for cond in conditions):
-                            if target_item is None or target_item not in triggered_by[cell_type]:
-                                source_item.activated_stars[cell_type] += 1
-                                if target_item:
-                                    target_item.occupying_stars.append((cell_type, source_item.name))
-                                    triggered_by[cell_type].add(target_item)
-
-        all_effects = []
-        for source_item in placed_items.values():
-            gx, gy = source_item.gx, source_item.gy
-            for r, row in enumerate(source_item.shape_matrix):
-                for c, cell_type in enumerate(row):
-                    if cell_type.name in source_item.star_effects:
-                         abs_x, abs_y = gx + c, gy + r
-                         target_item = occupancy_grid[abs_y][abs_x] if 0 <= abs_y < BACKPACK_ROWS and 0 <= abs_x < BACKPACK_COLS else None
-                         effect_data = source_item.star_effects[cell_type.name]
-                         if "effect" in effect_data:
-                            conditions = effect_data.get("conditions", [effect_data.get("condition", {})])
-                            if any(self._check_condition(cond, source_item, target_item) for cond in conditions):
-                                value = self._get_effect_value(effect_data, source_item)
-                                all_effects.append({"source": source_item, "target": target_item, "effect": effect_data["effect"], "value": value})
-        
-        for effect_type in ["ADD_SCORE_TO_SELF", "ADD_SCORE_TO_TARGET"]:
-            for eff in all_effects:
-                if eff["effect"] == effect_type:
-                    if eff["effect"] == "ADD_SCORE_TO_SELF": eff["source"].final_score += eff["value"]; eff["source"].score_modifiers.append(f"+{eff['value']:.1f} (self)")
-                    elif eff["target"]: eff["target"].final_score += eff["value"]; eff["target"].score_modifiers.append(f"+{eff['value']:.1f} from {eff['source'].name}")
-        for effect_type in ["MULTIPLY_SCORE_OF_SELF", "MULTIPLY_SCORE_OF_TARGET"]:
-            for eff in all_effects:
-                if eff["effect"] == effect_type:
-                    if eff["effect"] == "MULTIPLY_SCORE_OF_SELF": eff["source"].final_score *= eff["value"]; eff["source"].score_modifiers.append(f"x{eff['value']:.2f} (self)")
-                    elif eff["target"]: eff["target"].final_score *= eff["value"]; eff["target"].score_modifiers.append(f"x{eff['value']:.2f} from {eff['source'].name}")
+RARITY_BORDER_COLORS = { Rarity.COMMON: (150, 150, 150), Rarity.RARE: (0, 100, 255), Rarity.EPIC: (138, 43, 226), Rarity.LEGENDARY: (255, 165, 0), Rarity.GODLY: (255, 215, 0), Rarity.UNIQUE: (255, 20, 147) }
+STAR_SHAPE_COLORS = { GridType.STAR_A: (255, 215, 0), GridType.STAR_B: (50, 205, 50), GridType.STAR_C: (148, 0, 211) }
 
 def load_items_from_file(filepath: str) -> List[Item]:
     items = []
@@ -195,7 +34,9 @@ def load_items_from_file(filepath: str) -> List[Item]:
             item = Item(SHOP_X+10, PANEL_Y+10+y_offset, item_data['name'], Rarity[item_data['rarity']], 
                         ItemClass[item_data['item_class']], [Element[e] for e in item_data.get('elements', [])], 
                         [ItemType[t] for t in item_data.get('types', [])], [[GridType(c) for c in r] for r in item_data['shape_matrix']],
-                        item_data.get('base_score', 0), item_data.get('star_effects', {}))
+                        item_data.get('base_score', 0), item_data.get('star_effects', {}),
+                        item_data.get('has_cooldown', False), item_data.get('is_start_of_battle', False),
+                        item_data.get('passive_effects', []))
             items.append(item)
             y_offset += item.rect.height + 10
     except Exception as e: print(f"Error loading items: {e}")
@@ -216,11 +57,6 @@ def is_placement_valid(item: Item, gx: int, gy: int, items_dict: Dict[Tuple[int,
                 if not(0<=ax<BACKPACK_COLS and 0<=ay<BACKPACK_ROWS): return False
                 if(ax,ay) in occupied_cells: return False
     return True
-
-def log_event(event_name: str, placed_items: Dict[Tuple[int, int], Item]):
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-    placed_items_repr = {pos: item.name for pos, item in placed_items.items()}
-    print(f"[{timestamp}] - {event_name} - {placed_items_repr}")
 
 def game_loop():
     pygame.init()
@@ -247,8 +83,6 @@ def game_loop():
         for event in pygame.event.get():
             if event.type == pygame.QUIT: running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                log_event(f"MOUSEBUTTONDOWN_{event.button}", placed_items)
-
                 if event.button == 4:
                     if shop_area_rect.collidepoint(mouse_pos): shop_scroll_y = max(0, shop_scroll_y - 20)
                     if info_panel_rect.collidepoint(mouse_pos): info_scroll_y = max(0, info_scroll_y - 20)
@@ -284,14 +118,13 @@ def game_loop():
                     else:
                         for item_t in items_in_shop:
                             if item_t.is_mouse_over_body(mouse_pos, item_t.rect.topleft):
-                                selected_item = Item(item_t.rect.x, item_t.rect.y, item_t.name, item_t.rarity, item_t.item_class, item_t.elements, item_t.types, copy.deepcopy(item_t.shape_matrix), item_t.base_score, item_t.star_effects)
+                                selected_item = Item(item_t.rect.x, item_t.rect.y, item_t.name, item_t.rarity, item_t.item_class, item_t.elements, item_t.types, copy.deepcopy(item_t.shape_matrix), item_t.base_score, item_t.star_effects, item_t.has_cooldown, item_t.is_start_of_battle, item_t.passive_effects)
                                 selected_item.dragging = True; offset_x, offset_y = item_t.rect.x-mouse_pos[0], item_t.rect.y-mouse_pos[1]; break
                     if calc_button.collidepoint(mouse_pos): 
-                        engine.run(placed_items)
+                        engine.run(placed_items, BACKPACK_COLS, BACKPACK_ROWS)
                         total_score = sum(item.final_score for item in placed_items.values())
             
             elif event.type == pygame.MOUSEBUTTONUP:
-                log_event("MOUSEBUTTONUP", placed_items)
                 if event.button == 1 and selected_item:
                     selected_item.dragging = False
                     

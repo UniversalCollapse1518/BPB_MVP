@@ -1,9 +1,6 @@
 from enum import Enum
 
 # --- Enums for Item Properties ---
-# By placing these in a separate file, both main.py and editor.py can import and use them
-# without duplicating code. This is a standard practice for larger projects.
-
 class GridType(Enum): 
     EMPTY = 0
     OCCUPIED = 1
@@ -29,26 +26,29 @@ class ItemClass(Enum):
     ADVENTURER = "Adventurer"
 
 class Element(Enum):
-    MELEE = "Melee"
-    RANGED = "Ranged"
-    EFFECT = "Effect"
-    NATURE = "Nature"
-    MAGIC = "Magic"
-    HOLY = "Holy"
-    DARK = "Dark"
-    VAMPIRIC = "Vampiric"
-    FIRE = "Fire"
-    ICE = "Ice"
-    TREASURE = "Treasure"
-    MUSICAL = "Musical"
+    MELEE = "Melee"; RANGED = "Ranged"; EFFECT = "Effect"; NATURE = "Nature"
+    MAGIC = "Magic"; HOLY = "Holy"; DARK = "Dark"; VAMPIRIC = "Vampiric"
+    FIRE = "Fire"; ICE = "Ice"; TREASURE = "Treasure"; MUSICAL = "Musical"
 
 class ItemType(Enum):
-    WEAPON = "Weapon"
-    SHIELD = "Shield"
-    ACCESSORY = "Accessory"
-    POTION = "Potion"
-    SPELL = "Spell"
-    FOOD = "Food"
-    BOOK = "Book"
-    PET = "Pet"
-    HELMET = "Helmet"
+    WEAPON = "Weapon"; SHIELD = "Shield"; ACCESSORY = "Accessory"; POTION = "Potion"
+    SPELL = "Spell"; FOOD = "Food"; BOOK = "Book"; PET = "Pet"; HELMET = "Helmet"
+    ARMOR = "Armor"; GEMSTONE = "Gemstone"; SKILL = "Skill"
+
+# --- Lists for Editor Dropdowns ---
+EFFECT_TYPES = [
+    "ADD_SCORE_TO_SELF", "ADD_SCORE_TO_TARGET",
+    "MULTIPLY_SCORE_OF_SELF", "MULTIPLY_SCORE_OF_TARGET",
+    "ADD_ELEMENT_TO_TARGET"
+]
+
+CONDITION_TYPES = [
+    "requires_name",
+    "requires_type",
+    "requires_element",
+    "requires_cooldown",
+    "requires_start_of_battle",
+    "requires_empty",
+    "must_be_different"
+]
+
