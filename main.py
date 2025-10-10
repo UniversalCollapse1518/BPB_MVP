@@ -7,16 +7,20 @@ import copy
 from definitions import GridType, Rarity, ItemClass, Element, ItemType
 from engine import Item, CalculationEngine
 
-SCREEN_WIDTH = 1200
-SCREEN_HEIGHT = 700
+# QoL CHANGE: Swapped Shop and Info panels for easier access
+SCREEN_WIDTH = 1366
+SCREEN_HEIGHT = 768
 GRID_SIZE = 40
 BACKPACK_COLS, BACKPACK_ROWS = 9, 7
 BACKPACK_X, BACKPACK_Y = 50, 50
 PANEL_START_X = BACKPACK_X + (BACKPACK_COLS * GRID_SIZE) + 50
 PANEL_Y = 50
-PANEL_HEIGHT = 550
-INFO_PANEL_X, INFO_PANEL_WIDTH = PANEL_START_X, 350
-SHOP_X, SHOP_WIDTH = INFO_PANEL_X + INFO_PANEL_WIDTH + 20, 200
+PANEL_HEIGHT = 630
+# --- MODIFIED: Panel X positions are swapped ---
+SHOP_WIDTH = 300
+INFO_PANEL_WIDTH = 550
+SHOP_X = PANEL_START_X
+INFO_PANEL_X = SHOP_X + SHOP_WIDTH + 20
 
 BG_COLOR = (255, 255, 255)
 FONT_COLOR = (10, 10, 10)
@@ -69,9 +73,30 @@ def game_loop():
     selected_item = None
     engine = CalculationEngine()
     
-    font_large, font_medium, font_small = pygame.font.SysFont(None, 32), pygame.font.SysFont(None, 24), pygame.font.SysFont(None, 20)
-    calc_button = pygame.Rect(PANEL_START_X, 660, INFO_PANEL_WIDTH + SHOP_WIDTH + 20, 30)
-    shop_area_rect, info_panel_rect = pygame.Rect(SHOP_X, PANEL_Y, SHOP_WIDTH, PANEL_HEIGHT), pygame.Rect(INFO_PANEL_X, PANEL_Y, INFO_PANEL_WIDTH, PANEL_HEIGHT)
+    font_large = pygame.font.SysFont('verdana', 34)
+    font_medium = pygame.font.SysFont('verdana', 26)
+    font_small = pygame.font.SysFont('verdana', 21)
+    font_button = pygame.font.SysFont('verdana', 18)
+    
+    bp_width = BACKPACK_COLS * GRID_SIZE
+    solve_btn_width = (bp_width - 20) / 2
+    solve_btn_height = 40
+    solve_button_names = [f"Solve (Algorithm {chr(65+i)})" for i in range(4)]
+    solve_buttons = [
+        pygame.Rect(BACKPACK_X, (BACKPACK_Y + BACKPACK_ROWS * GRID_SIZE) + 20, solve_btn_width, solve_btn_height),
+        pygame.Rect(BACKPACK_X + solve_btn_width + 20, (BACKPACK_Y + BACKPACK_ROWS * GRID_SIZE) + 20, solve_btn_width, solve_btn_height),
+        pygame.Rect(BACKPACK_X, (BACKPACK_Y + BACKPACK_ROWS * GRID_SIZE) + 20 + solve_btn_height + 10, solve_btn_width, solve_btn_height),
+        pygame.Rect(BACKPACK_X + solve_btn_width + 20, (BACKPACK_Y + BACKPACK_ROWS * GRID_SIZE) + 20 + solve_btn_height + 10, solve_btn_width, solve_btn_height)
+    ]
+    
+    # --- MODIFIED: Rects now use the swapped X coordinates ---
+    shop_area_rect = pygame.Rect(SHOP_X, PANEL_Y, SHOP_WIDTH, PANEL_HEIGHT)
+    info_panel_rect = pygame.Rect(INFO_PANEL_X, PANEL_Y, INFO_PANEL_WIDTH, PANEL_HEIGHT)
+    total_score_rect = pygame.Rect(PANEL_START_X, info_panel_rect.bottom + 5, INFO_PANEL_WIDTH + SHOP_WIDTH + 20, 45)
+    
+    calc_text_surf = font_medium.render("Calculate", True, FONT_COLOR)
+    calc_button_width = calc_text_surf.get_width() + 40
+    calc_button = pygame.Rect(PANEL_START_X, total_score_rect.bottom + 5, calc_button_width, 40)
     
     shop_scroll_y, info_scroll_y = 0, 0
     total_shop_height = sum(item.rect.height + 10 for item in items_in_shop) if items_in_shop else 0
@@ -149,7 +174,6 @@ def game_loop():
         screen.fill(BG_COLOR)
         bp_rect = pygame.Rect(BACKPACK_X, BACKPACK_Y, BACKPACK_COLS*GRID_SIZE, BACKPACK_ROWS*GRID_SIZE)
         pygame.draw.rect(screen, (230,230,230), bp_rect); pygame.draw.rect(screen, (240,240,240), shop_area_rect, 2); 
-        total_score_rect = pygame.Rect(info_panel_rect.left, info_panel_rect.bottom, info_panel_rect.width, 50)
         pygame.draw.rect(screen, (210, 210, 210), total_score_rect)
         pygame.draw.rect(screen, (180, 180, 180), total_score_rect, 2)
         pygame.draw.rect(screen, (220,220,220), info_panel_rect); pygame.draw.rect(screen, (180,180,180), info_panel_rect, 2)
@@ -159,25 +183,27 @@ def game_loop():
 
         screen.set_clip(info_panel_rect)
         screen.blit(font_large.render("Backpack Contents", True, FONT_COLOR), (info_panel_rect.x+10, info_panel_rect.y+10-info_scroll_y))
-        y_off = 45
+        y_off = 55 
         for item in placed_items.values():
-            screen.blit(font_medium.render(f"- {item.name}", True, FONT_COLOR), (info_panel_rect.x+15, info_panel_rect.y+y_off-info_scroll_y)); y_off += 25
+            screen.blit(font_medium.render(f"- {item.name}", True, FONT_COLOR), (info_panel_rect.x+15, info_panel_rect.y+y_off-info_scroll_y)); y_off += 30
             elems = f"Elem: {', '.join(e.name for e in item.elements) or 'None'}"; types = f"Type: {', '.join(t.name for t in item.types) or 'None'}"
-            screen.blit(font_small.render(elems, True, (60,60,60)), (info_panel_rect.x+25, info_panel_rect.y+y_off-info_scroll_y)); y_off += 20
+            screen.blit(font_small.render(elems, True, (60,60,60)), (info_panel_rect.x+25, info_panel_rect.y+y_off-info_scroll_y)); y_off += 25
             screen.blit(font_small.render(types, True, (60,60,60)), (info_panel_rect.x+25, info_panel_rect.y+y_off-info_scroll_y)); y_off += 25
             star_txt = f"Activated: A:{item.activated_stars[GridType.STAR_A]} B:{item.activated_stars[GridType.STAR_B]} C:{item.activated_stars[GridType.STAR_C]}"
-            screen.blit(font_small.render(star_txt, True, (60,60,60)), (info_panel_rect.x+25, info_panel_rect.y+y_off-info_scroll_y)); y_off += 20
+            screen.blit(font_small.render(star_txt, True, (60,60,60)), (info_panel_rect.x+25, info_panel_rect.y+y_off-info_scroll_y)); y_off += 25
             if item.occupying_stars:
-                screen.blit(font_small.render("Occupying:", True, (60,60,60)), (info_panel_rect.x+25, info_panel_rect.y+y_off-info_scroll_y)); y_off += 20
-                for star_type, source_name in item.occupying_stars: screen.blit(font_small.render(f"  - {source_name}'s {star_type.name}", True, (80,80,80)), (info_panel_rect.x+25, info_panel_rect.y+y_off-info_scroll_y)); y_off += 20
-            screen.blit(font_small.render(f"Base Score: {item.base_score}", True, (60,60,60)), (info_panel_rect.x+25, info_panel_rect.y+y_off-info_scroll_y)); y_off += 20
-            for mod in item.score_modifiers: screen.blit(font_small.render(f"  {mod}", True, (20,100,20)), (info_panel_rect.x+25, info_panel_rect.y+y_off-info_scroll_y)); y_off += 20
-            screen.blit(font_medium.render(f"Final Score: {item.final_score:.1f}", True, FONT_COLOR), (info_panel_rect.x+25, info_panel_rect.y+y_off-info_scroll_y)); y_off += 25
+                screen.blit(font_small.render("Occupying:", True, (60,60,60)), (info_panel_rect.x+25, info_panel_rect.y+y_off-info_scroll_y)); y_off += 25
+                for star_type, source_name in item.occupying_stars: screen.blit(font_small.render(f"  - {source_name}'s {star_type.name}", True, (80,80,80)), (info_panel_rect.x+25, info_panel_rect.y+y_off-info_scroll_y)); y_off += 25
+            screen.blit(font_small.render(f"Base Score: {item.base_score}", True, (60,60,60)), (info_panel_rect.x+25, info_panel_rect.y+y_off-info_scroll_y)); y_off += 25
+            for mod in item.score_modifiers: screen.blit(font_small.render(f"  {mod}", True, (20,100,20)), (info_panel_rect.x+25, info_panel_rect.y+y_off-info_scroll_y)); y_off += 25
+            screen.blit(font_medium.render(f"Final Score: {item.final_score:.1f}", True, FONT_COLOR), (info_panel_rect.x+25, info_panel_rect.y+y_off-info_scroll_y)); y_off += 30
             y_off += 15
         screen.set_clip(None)
         
         total_score_text = f"Total Score: {total_score:.1f}"
-        screen.blit(font_large.render(total_score_text, True, FONT_COLOR), (total_score_rect.x + 10, total_score_rect.centery - 16))
+        total_score_surf = font_large.render(total_score_text, True, FONT_COLOR)
+        total_score_text_rect = total_score_surf.get_rect(center=total_score_rect.center)
+        screen.blit(total_score_surf, total_score_text_rect)
 
         all_items = [(item, (BACKPACK_X + item.gx * GRID_SIZE, BACKPACK_Y + item.gy * GRID_SIZE)) for item in placed_items.values()]
         for item in items_in_shop: item.rect.y=item.base_y-shop_scroll_y; all_items.append((item, item.rect.topleft))
@@ -200,22 +226,29 @@ def game_loop():
                 screen.blit(tint, selected_item.rect.topleft)
 
         pygame.draw.rect(screen, (100, 200, 100), calc_button)
-        screen.blit(font_medium.render("Calculate", True, FONT_COLOR), calc_button.inflate(-10,-10))
+        calc_text_rect = calc_text_surf.get_rect(center=calc_button.center)
+        screen.blit(calc_text_surf, calc_text_rect)
 
-        debug_y_offset = bp_rect.bottom + 10
+        for i, btn_rect in enumerate(solve_buttons):
+            pygame.draw.rect(screen, (180, 180, 220), btn_rect)
+            btn_text_surf = font_button.render(solve_button_names[i], True, FONT_COLOR)
+            btn_text_rect = btn_text_surf.get_rect(center=btn_rect.center)
+            screen.blit(btn_text_surf, btn_text_rect)
+        
+        debug_y_offset = solve_buttons[-1].bottom + 20
         mouse_pos_text = f"Mouse Position: {mouse_pos}"
-        screen.blit(font_small.render(mouse_pos_text, True, FONT_COLOR), (bp_rect.left, debug_y_offset)); debug_y_offset += 20
+        screen.blit(font_small.render(mouse_pos_text, True, FONT_COLOR), (bp_rect.left, debug_y_offset)); debug_y_offset += 25
         dragging_item_text = f"Dragging: {selected_item.name if selected_item else 'None'}"
-        screen.blit(font_small.render(dragging_item_text, True, FONT_COLOR), (bp_rect.left, debug_y_offset)); debug_y_offset += 20
-        screen.blit(font_small.render("Placed Items:", True, FONT_COLOR), (bp_rect.left, debug_y_offset)); debug_y_offset += 20
+        screen.blit(font_small.render(dragging_item_text, True, FONT_COLOR), (bp_rect.left, debug_y_offset)); debug_y_offset += 25
+        screen.blit(font_small.render("Placed Items:", True, FONT_COLOR), (bp_rect.left, debug_y_offset)); debug_y_offset += 25
         if placed_items:
             item_strings = [f"{pos}: '{item.name}'" for pos, item in placed_items.items()]
             for i in range(0, len(item_strings), 2):
                 line_text = item_strings[i]
                 if i + 1 < len(item_strings): line_text += f",   {item_strings[i+1]}"
-                screen.blit(font_small.render(line_text, True, FONT_COLOR), (bp_rect.left + 15, debug_y_offset)); debug_y_offset += 20
+                screen.blit(font_small.render(line_text, True, FONT_COLOR), (bp_rect.left + 15, debug_y_offset)); debug_y_offset += 25
         else:
-            screen.blit(font_small.render("  None", True, FONT_COLOR), (bp_rect.left + 15, debug_y_offset)); debug_y_offset += 20
+            screen.blit(font_small.render("  None", True, FONT_COLOR), (bp_rect.left + 15, debug_y_offset)); debug_y_offset += 25
 
         pygame.display.flip()
         clock.tick(60)
@@ -225,4 +258,3 @@ def game_loop():
 
 if __name__ == "__main__": 
     game_loop()
-

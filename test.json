@@ -1,537 +1,8 @@
 {
-  "Banana": {
-    "name": "Banana",
-    "rarity": "COMMON",
-    "item_class": "NEUTRAL",
-    "elements": [
-      "NATURE"
-    ],
-    "types": [
-      "FOOD"
-    ],
-    "base_score": 3,
-    "shape_matrix": [
-      [
-        0,
-        2,
-        0,
-        0
-      ],
-      [
-        2,
-        1,
-        2,
-        0
-      ],
-      [
-        2,
-        1,
-        1,
-        2
-      ],
-      [
-        0,
-        2,
-        2,
-        0
-      ]
-    ],
-    "star_effects": {
-      "STAR_A": {
-        "condition": {
-          "must_be_different": true,
-          "requires_type": "FOOD"
-        },
-        "effect": "MULTIPLY_SCORE_OF_SELF",
-        "value": 1.1
-      }
-    }
-  },
-  "BlackScroll": {
-    "base_score": 0,
-    "elements": [
-      "MAGIC",
-      "DARK"
-    ],
-    "item_class": "MAGE",
-    "name": "Black Scroll",
-    "rarity": "GODLY",
-    "shape_matrix": [
-      [
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
-      ],
-      [
-        0,
-        0,
-        0,
-        2,
-        0,
-        0,
-        0
-      ],
-      [
-        0,
-        3,
-        0,
-        0,
-        3,
-        2,
-        0
-      ],
-      [
-        0,
-        0,
-        0,
-        1,
-        1,
-        0,
-        0
-      ],
-      [
-        0,
-        2,
-        3,
-        0,
-        0,
-        3,
-        0
-      ],
-      [
-        0,
-        0,
-        0,
-        0,
-        2,
-        0,
-        0
-      ],
-      [
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
-      ]
-    ],
-    "star_effects": {
-      "STAR_A": {
-        "condition": {},
-        "effect": "MULTIPLY_SCORE_OF_TARGET",
-        "value": {
-          "base": 1.2,
-          "dynamic_bonus": {
-            "add": 0.05,
-            "per_activated_star": "STAR_B"
-          }
-        }
-      },
-      "STAR_B": {
-        "condition": {
-          "requires_element": "DARK"
-        }
-      }
-    },
-    "types": [
-      "SPELL"
-    ]
-  },
-  "BlueBerry": {
-    "base_score": 2,
-    "elements": [
-      "NATURE",
-      "MAGIC"
-    ],
-    "item_class": "NEUTRAL",
-    "name": "Blue Berry",
-    "rarity": "RARE",
-    "shape_matrix": [
-      [
-        0,
-        2,
-        0
-      ],
-      [
-        2,
-        1,
-        2
-      ],
-      [
-        0,
-        2,
-        0
-      ]
-    ],
-    "star_effects": {
-      "STAR_A": {
-        "condition": {
-          "must_be_different": true,
-          "requires_type": "FOOD"
-        },
-        "effect": "MULTIPLY_SCORE_OF_SELF",
-        "value": 1.1
-      }
-    },
-    "types": [
-      "FOOD"
-    ]
-  },
-  "Pan": {
-    "base_score": 6,
-    "elements": [],
-    "item_class": "NEUTRAL",
-    "name": "Pan",
-    "rarity": "COMMON",
-    "shape_matrix": [
-      [
-        0,
-        2,
-        0,
-        0
-      ],
-      [
-        2,
-        1,
-        2,
-        0
-      ],
-      [
-        2,
-        1,
-        1,
-        2
-      ],
-      [
-        0,
-        2,
-        2,
-        0
-      ]
-    ],
-    "star_effects": {
-      "STAR_A": {
-        "condition": {
-          "requires_type": "FOOD"
-        },
-        "effect": "ADD_SCORE_TO_SELF",
-        "value": 2
-      }
-    },
-    "types": [
-      "WEAPON"
-    ]
-  },
-  "RedBook": {
-    "base_score": 8,
-    "elements": [
-      "MAGIC"
-    ],
-    "item_class": "MAGE",
-    "name": "Red Book",
-    "rarity": "COMMON",
-    "shape_matrix": [
-      [
-        0,
-        2,
-        0
-      ],
-      [
-        2,
-        1,
-        2
-      ],
-      [
-        2,
-        1,
-        2
-      ],
-      [
-        0,
-        2,
-        0
-      ]
-    ],
-    "star_effects": {
-      "STAR_A": {
-        "condition": {
-          "requires_type": "SPELL"
-        },
-        "effect": "ADD_SCORE_TO_SELF",
-        "value": 5
-      }
-    },
-    "types": [
-      "SPELL"
-    ]
-  },
-  "hatefulhat": {
-    "name": "hateful hat",
-    "rarity": "UNIQUE",
-    "item_class": "MAGE",
-    "elements": [
-      "DARK",
-      "MAGIC"
-    ],
-    "types": [
-      "HELMET",
-      "PET"
-    ],
-    "base_score": 20,
-    "has_cooldown": false,
-    "shape_matrix": [
-      [
-        0,
-        0,
-        2,
-        0,
-        0
-      ],
-      [
-        0,
-        2,
-        2,
-        2,
-        0
-      ],
-      [
-        0,
-        2,
-        1,
-        2,
-        0
-      ],
-      [
-        0,
-        1,
-        1,
-        1,
-        0
-      ],
-      [
-        0,
-        3,
-        3,
-        3,
-        0
-      ],
-      [
-        0,
-        3,
-        3,
-        3,
-        0
-      ]
-    ],
-    "passive_effects": [],
-    "star_effects": {
-      "STAR_A": [
-        {
-          "effect": "MULTIPLY_SCORE_OF_TARGET",
-          "value": "2",
-          "condition": {
-            "requires_type": "WEAPON"
-          }
-        }
-      ],
-      "STAR_B": [
-        {
-          "effect": "ADD_SCORE_TO_SELF",
-          "value": "5",
-          "condition": {}
-        }
-      ]
-    }
-  },
-  "shield": {
-    "base_score": 3,
-    "elements": [],
-    "item_class": "NEUTRAL",
-    "name": "Shield",
-    "rarity": "COMMON",
-    "shape_matrix": [
-      [
-        1,
-        1
-      ],
-      [
-        1,
-        1
-      ]
-    ],
-    "types": [
-      "SHIELD"
-    ]
-  },
-  "spear": {
-    "base_score": 6,
-    "elements": [
-      "MELEE"
-    ],
-    "item_class": "NEUTRAL",
-    "name": "Spear",
-    "rarity": "COMMON",
-    "shape_matrix": [
-      [
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
-      ],
-      [
-        1,
-        1,
-        1,
-        1,
-        2,
-        2,
-        2,
-        2,
-        2
-      ],
-      [
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
-      ]
-    ],
-    "star_effects": {
-      "STAR_A": {
-        "conditions": [
-          {
-            "requires_empty": true
-          }
-        ],
-        "effect": "ADD_SCORE_TO_SELF",
-        "value": 3
-      }
-    },
-    "types": [
-      "WEAPON"
-    ]
-  },
-  "sword": {
-    "base_score": 3,
-    "elements": [
-      "MELEE"
-    ],
-    "item_class": "NEUTRAL",
-    "name": "Sword",
-    "rarity": "COMMON",
-    "shape_matrix": [
-      [
-        0,
-        0,
-        0
-      ],
-      [
-        0,
-        1,
-        0
-      ],
-      [
-        0,
-        1,
-        0
-      ]
-    ],
-    "types": [
-      "WEAPON"
-    ]
-  },
-  "purpleGem": {
-    "name": "purple Gem",
-    "rarity": "COMMON",
-    "item_class": "NEUTRAL",
-    "elements": [
-      "DARK"
-    ],
-    "types": [
-      "BOOK"
-    ],
-    "base_score": 10,
-    "has_cooldown": false,
-    "shape_matrix": [
-      [
-        1
-      ]
-    ],
-    "passive_effects": [],
-    "star_effects": {}
-  },
-  "testpassive": {
-    "name": "test passive",
-    "rarity": "LEGENDARY",
-    "item_class": "NEUTRAL",
-    "elements": [
-      "HOLY"
-    ],
-    "types": [
-      "BOOK"
-    ],
-    "base_score": 5,
-    "has_cooldown": false,
-    "is_start_of_battle": false,
-    "shape_matrix": [
-      [
-        0,
-        2,
-        2,
-        0,
-        0
-      ],
-      [
-        2,
-        1,
-        1,
-        2,
-        0
-      ],
-      [
-        0,
-        2,
-        1,
-        1,
-        2
-      ],
-      [
-        0,
-        0,
-        2,
-        2,
-        0
-      ]
-    ],
-    "passive_effects": [
-      {
-        "effect": "ADD_SCORE_TO_TARGET",
-        "value": "3",
-        "condition": {}
-      }
-    ],
-    "star_effects": {}
-  },
   "DarkArmor": {
     "name": "Dark Armor",
     "rarity": "GODLY",
-    "item_class": "MAGE",
+    "item_class": "NEUTRAL",
     "elements": [
       "DARK"
     ],
@@ -587,9 +58,166 @@
       "STAR_A_2": [
         {
           "effect": "ADD_SCORE_TO_SELF",
-          "value": "8",
+          "value": 8,
           "condition": {
             "requires_element": "DARK"
+          }
+        }
+      ]
+    }
+  },
+  "NullBlade": {
+    "name": "Null Blade",
+    "rarity": "GODLY",
+    "item_class": "MAGE",
+    "elements": [
+      "DARK",
+      "HOLY",
+      "MAGIC",
+      "MELEE"
+    ],
+    "types": [
+      "SPELL",
+      "WEAPON"
+    ],
+    "base_score": 40,
+    "has_cooldown": true,
+    "is_start_of_battle": false,
+    "shape_matrix": [
+      [
+        1
+      ],
+      [
+        1
+      ],
+      [
+        1
+      ]
+    ],
+    "passive_effects": [],
+    "star_effects": {}
+  },
+  "HatefulHat": {
+    "name": "Hateful Hat",
+    "rarity": "UNIQUE",
+    "item_class": "MAGE",
+    "elements": [
+      "DARK",
+      "MAGIC"
+    ],
+    "types": [
+      "HELMET",
+      "PET"
+    ],
+    "base_score": 10,
+    "has_cooldown": true,
+    "is_start_of_battle": false,
+    "shape_matrix": [
+      [
+        0,
+        2,
+        0
+      ],
+      [
+        2,
+        2,
+        2
+      ],
+      [
+        2,
+        1,
+        2
+      ],
+      [
+        1,
+        1,
+        1
+      ],
+      [
+        3,
+        3,
+        3
+      ],
+      [
+        3,
+        3,
+        3
+      ]
+    ],
+    "passive_effects": [
+      {
+        "effect": "ADD_SCORE_TO_SELF",
+        "value": 10,
+        "condition": {
+          "requires_name": [
+            "Poison Spear"
+          ]
+        }
+      }
+    ],
+    "star_effects": {
+      "STAR_A_1": [
+        {
+          "effect": "ADD_SCORE_TO_TARGET",
+          "value": 20,
+          "condition": {
+            "requires_type": "WEAPON"
+          }
+        },
+        {
+          "effect": "ADD_SCORE_TO_TARGET",
+          "value": 40,
+          "condition": {
+            "requires_name": "Null Blade"
+          }
+        }
+      ],
+      "STAR_B_1": [
+        {
+          "effect": "ADD_SCORE_TO_SELF",
+          "value": 10,
+          "condition": {
+            "requires_element": "DARK"
+          }
+        }
+      ]
+    }
+  },
+  "PoisonSpear": {
+    "name": "Poison Spear",
+    "rarity": "LEGENDARY",
+    "item_class": "NEUTRAL",
+    "elements": [
+      "MELEE"
+    ],
+    "types": [
+      "WEAPON"
+    ],
+    "base_score": 15,
+    "has_cooldown": true,
+    "is_start_of_battle": false,
+    "shape_matrix": [
+      [
+        1,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2
+      ]
+    ],
+    "passive_effects": [],
+    "star_effects": {
+      "STAR_A_1": [
+        {
+          "effect": "ADD_SCORE_TO_SELF",
+          "value": 3,
+          "condition": {
+            "requires_empty": "",
+            "requires_element": "NATURE"
           }
         }
       ]

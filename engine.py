@@ -95,13 +95,32 @@ class CalculationEngine:
         if condition_data.get("requires_empty", False): return target_item is None
         if target_item is None: return False
         
-        all_elements = target_item.elements + target_item.temporary_elements
-        if "requires_element" in condition_data and Element[condition_data["requires_element"]] not in all_elements: return False
-        
-        if "requires_type" in condition_data and ItemType[condition_data["requires_type"]] not in target_item.types: return False
+        if "requires_element" in condition_data:
+            required_elements = condition_data["requires_element"]
+            if not isinstance(required_elements, list):
+                required_elements = [required_elements]
+            
+            target_elements = set(target_item.elements + target_item.temporary_elements)
+            if not any(Element[req] in target_elements for req in required_elements):
+                return False
+
+        if "requires_type" in condition_data:
+            required_types = condition_data["requires_type"]
+            if not isinstance(required_types, list):
+                required_types = [required_types]
+
+            if not any(ItemType[req] in target_item.types for req in required_types):
+                return False
+
+        if "requires_name" in condition_data:
+            required_names = condition_data["requires_name"]
+            if not isinstance(required_names, list):
+                required_names = [required_names]
+            
+            if target_item.name not in required_names:
+                return False
+
         if condition_data.get("must_be_different", False) and source_item.name == target_item.name: return False
-        
-        if "requires_name" in condition_data and target_item.name != condition_data["requires_name"]: return False
         if condition_data.get("requires_cooldown", False) and not getattr(target_item, 'has_cooldown', False): return False
         if condition_data.get("requires_start_of_battle", False) and not getattr(target_item, 'is_start_of_battle', False): return False
         
@@ -186,20 +205,18 @@ class CalculationEngine:
                 for target_item in placed_items.values():
                     if self._check_condition(effect_data.get("condition", {}), source_item, target_item):
                         value = self._get_effect_value(effect_data, source_item)
-                        all_effects.append({"source": source_item, "target": target_item, "effect": effect_data["effect"], "value": value})
+                        # QoL CHANGE: Add a 'reason' for the effect
+                        reason = f"Passive from {target_item.name}"
+                        all_effects.append({"source": source_item, "target": target_item, "effect": effect_data["effect"], "value": value, "reason": reason})
 
-            # BUG FIX: Initialize a tracker for each source_item to ensure star effects
-            # are applied only once per unique target item, per star type.
             triggered_targets = {GridType.STAR_A: set(), GridType.STAR_B: set(), GridType.STAR_C: set()}
             gx, gy = source_item.gx, source_item.gy
             for r, row in enumerate(source_item.shape_matrix):
                 for c, cell_type in enumerate(row):
-                    if cell_type in triggered_targets: # A more direct way to check if it's a star
+                    if cell_type in triggered_targets:
                         abs_x, abs_y = gx + c, gy + r
                         target_item = occupancy_grid[abs_y][abs_x] if 0 <= abs_y < backpack_rows and 0 <= abs_x < backpack_cols else None
 
-                        # Check if this specific target has already triggered this star type.
-                        # This handles both items and the `None` case (if None is already in the set).
                         if target_item in triggered_targets[cell_type]:
                             continue
                         
@@ -214,23 +231,36 @@ class CalculationEngine:
                                     if self._check_condition(effect_data.get("condition", {}), source_item, target_item):
                                         if "effect" in effect_data and "SCORE" in effect_data["effect"]:
                                             value = self._get_effect_value(effect_data, source_item)
-                                            all_effects.append({"source": source_item, "target": target_item, "effect": effect_data["effect"], "value": value})
+                                            # QoL CHANGE: Add a 'reason' for the effect
+                                            reason = f"Star {cell_type.name.split('_')[1]}"
+                                            all_effects.append({"source": source_item, "target": target_item, "effect": effect_data["effect"], "value": value, "reason": reason})
                                         
-                                        # It's a valid trigger, so record the target and stop processing this cell
                                         triggered_targets[cell_type].add(target_item)
                                         effect_applied_for_this_cell = True
-                                        break # Exit effect_data loop
+                                        break
                                 if effect_applied_for_this_cell:
-                                    break # Exit star_key loop
+                                    break
         
         for effect_type in ["ADD_SCORE_TO_SELF", "ADD_SCORE_TO_TARGET"]:
             for eff in all_effects:
                 if eff["effect"] == effect_type:
-                    if eff["effect"] == "ADD_SCORE_TO_SELF": eff["source"].final_score += eff["value"]; eff["source"].score_modifiers.append(f"+{eff['value']:.1f} (self)")
-                    elif eff["target"]: eff["target"].final_score += eff["value"]; eff["target"].score_modifiers.append(f"+{eff['value']:.1f} from {eff['source'].name}")
+                    # QoL CHANGE: Use the 'reason' to create a more descriptive modifier string
+                    if eff["effect"] == "ADD_SCORE_TO_SELF":
+                        reason_text = eff.get("reason", "self")
+                        eff["source"].final_score += eff["value"]
+                        eff["source"].score_modifiers.append(f"+{eff['value']:.1f} ({reason_text})")
+                    elif eff["target"]:
+                        eff["target"].final_score += eff["value"]
+                        eff["target"].score_modifiers.append(f"+{eff['value']:.1f} from {eff['source'].name}")
         
         for effect_type in ["MULTIPLY_SCORE_OF_SELF", "MULTIPLY_SCORE_OF_TARGET"]:
             for eff in all_effects:
                 if eff["effect"] == effect_type:
-                    if eff["effect"] == "MULTIPLY_SCORE_OF_SELF": eff["source"].final_score *= eff["value"]; eff["source"].score_modifiers.append(f"x{eff['value']:.2f} (self)")
-                    elif eff["target"]: eff["target"].final_score *= eff["value"]; eff["target"].score_modifiers.append(f"x{eff['value']:.2f} from {eff['source'].name}")
+                    # QoL CHANGE: Use the 'reason' to create a more descriptive modifier string
+                    if eff["effect"] == "MULTIPLY_SCORE_OF_SELF":
+                        reason_text = eff.get("reason", "self")
+                        eff["source"].final_score *= eff["value"]
+                        eff["source"].score_modifiers.append(f"x{eff['value']:.2f} ({reason_text})")
+                    elif eff["target"]:
+                        eff["target"].final_score *= eff["value"]
+                        eff["target"].score_modifiers.append(f"x{eff['value']:.2f} from {eff['source'].name}")

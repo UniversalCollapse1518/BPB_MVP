@@ -286,9 +286,9 @@ class ItemEditorApp(ctk.CTk):
         for key in all_effect_keys:
             effect_list = []
             scroll_frame = self.effect_widgets[key]['scroll_frame']
-            for w in scroll_frame.winfo_children():
+            # BUG FIX: Use pack_slaves() to get widgets in their visual order, not creation order.
+            for w in scroll_frame.pack_slaves():
                 if isinstance(w, ctk.CTkFrame) and hasattr(w, 'widgets'):
-                    # BUG FIX: Evaluate the value from the entry box to get the correct data type.
                     value_str = w.widgets['value'].get()
                     try: value = eval(value_str)
                     except (NameError, SyntaxError): value = value_str
