@@ -54,6 +54,10 @@ def load_items_from_file(filepath: str) -> List[Item]:
 def discover_solvers() -> Dict[str, Type[BaseSolver]]:
     solvers = {}
     solver_dir = 'solvers'
+    # Format a display name from a class name, e.g., 'GeneticSolver' -> 'Genetic'
+    def format_name(name):
+        return name.replace('Solver', '')
+
     for filename in os.listdir(solver_dir):
         if filename.endswith('.py') and filename != 'base_solver.py':
             module_name = f"{solver_dir}.{filename[:-3]}"
@@ -63,8 +67,7 @@ def discover_solvers() -> Dict[str, Type[BaseSolver]]:
                 spec.loader.exec_module(module)
                 for name, obj in inspect.getmembers(module, inspect.isclass):
                     if issubclass(obj, BaseSolver) and obj is not BaseSolver:
-                        display_name = ' '.join(a for a in name.replace('Solver', '') for a in a)
-                        solvers[display_name] = obj
+                        solvers[format_name(name)] = obj
     return solvers
 
 def is_placement_valid(item: Item, gx: int, gy: int, items_dict: Dict[Tuple[int, int], Item]) -> bool:
@@ -155,14 +158,14 @@ def game_loop():
                         else:
                            dropdown_open = False
                     elif run_solver_button.collidepoint(mouse_pos) and selected_solver_name in available_solvers:
-                        # --- MODIFIED: Solver now uses items from the backpack ---
                         items_in_backpack = list(placed_items.values())
                         if not items_in_backpack:
                             print("Solver Error: No items in the backpack to solve for.")
                         else:
                             SolverClass = available_solvers[selected_solver_name]
-                            solver_instance = SolverClass(items_in_backpack, BACKPACK_COLS, BACKPACK_ROWS)
-                            print(f"Running {selected_solver_name}...")
+                            # --- MODIFIED: Pass the current layout to the solver ---
+                            solver_instance = SolverClass(items_in_backpack, BACKPACK_COLS, BACKPACK_ROWS, initial_layout=placed_items)
+                            print(f"Running {selected_solver_name} Solver...")
                             best_layout, best_score = solver_instance.solve()
                             placed_items = best_layout
                             engine.run(placed_items, BACKPACK_COLS, BACKPACK_ROWS)

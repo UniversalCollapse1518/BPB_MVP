@@ -148,9 +148,20 @@
       {
         "effect": "ADD_SCORE_TO_SELF",
         "value": 10,
+        "condition_logic": "AND",
         "condition": {
           "requires_name": [
             "Poison Spear"
+          ]
+        }
+      },
+      {
+        "effect": "ADD_SCORE_TO_SELF",
+        "value": 20,
+        "condition_logic": "AND",
+        "condition": {
+          "requires_name": [
+            "Stone Armor"
           ]
         }
       }
@@ -160,6 +171,7 @@
         {
           "effect": "ADD_SCORE_TO_TARGET",
           "value": 40,
+          "condition_logic": "AND",
           "condition": {
             "requires_name": "Null Blade"
           }
@@ -167,6 +179,7 @@
         {
           "effect": "ADD_SCORE_TO_TARGET",
           "value": 20,
+          "condition_logic": "AND",
           "condition": {
             "requires_type": "WEAPON"
           }
@@ -176,6 +189,7 @@
         {
           "effect": "ADD_SCORE_TO_SELF",
           "value": 10,
+          "condition_logic": "AND",
           "condition": {
             "requires_element": "DARK"
           }
@@ -416,5 +430,33 @@
         }
       ]
     }
+  },
+  "StoneArmor": {
+    "name": "Stone Armor",
+    "rarity": "LEGENDARY",
+    "item_class": "NEUTRAL",
+    "elements": [],
+    "types": [
+      "ARMOR"
+    ],
+    "base_score": 40,
+    "has_cooldown": true,
+    "is_start_of_battle": true,
+    "shape_matrix": [
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        1
+      ]
+    ],
+    "passive_effects": [],
+    "star_effects": {}
   }
 }
