@@ -9,6 +9,8 @@ GRID_COLORS = {-1: "#2B2B2B", 0:"#343638", 1:"#A9A9A9", 2:"#FFD700", 3:"#32CD32"
 BRUSH_NAMES = {-1: "NULL", 0: "EMPTY", 1: "BODY", 2: "STAR A", 3: "STAR B", 4: "STAR C"}
 STAR_EFFECT_KEYS = ["STAR_A_1", "STAR_A_2", "STAR_B_1", "STAR_B_2", "STAR_C_1", "STAR_C_2"]
 LOGIC_OPTIONS = ["Match All (AND)", "Match Any (OR)"]
+STAR_TYPES_FOR_DROPDOWN = ["STAR_A", "STAR_B", "STAR_C"]
+BOOL_CONDITIONS = ["requires_cooldown", "requires_start_of_battle", "requires_empty", "must_be_different"]
 
 class ItemEditorApp(ctk.CTk):
     def __init__(self):
@@ -123,41 +125,77 @@ class ItemEditorApp(ctk.CTk):
     def _add_effect_frame(self, parent, key, effect_data=None):
         effect_frame = ctk.CTkFrame(parent, border_width=1)
         effect_frame.pack(pady=5, padx=5, fill="x", expand=True)
-        
         effect_frame.grid_columnconfigure(1, weight=1)
-        
+
         control_frame = ctk.CTkFrame(effect_frame, fg_color="transparent")
         control_frame.grid(row=0, column=2, padx=5, pady=5, sticky="ne")
         ctk.CTkButton(control_frame, text="↑", width=25, command=lambda f=effect_frame, p=parent: self._move_effect(p, f, "up")).pack(side="left")
         ctk.CTkButton(control_frame, text="↓", width=25, command=lambda f=effect_frame, p=parent: self._move_effect(p, f, "down")).pack(side="left", padx=2)
         ctk.CTkButton(control_frame, text="X", width=25, command=lambda f=effect_frame: self._remove_effect_frame(f, key)).pack(side="left")
-        
+
         ctk.CTkLabel(effect_frame, text="Effect Type:").grid(row=0, column=0, padx=5, pady=2, sticky="w")
         effect_type_var = ctk.StringVar(value=effect_data.get('effect', EFFECT_TYPES[0]) if effect_data else EFFECT_TYPES[0])
         ctk.CTkOptionMenu(effect_frame, variable=effect_type_var, values=EFFECT_TYPES).grid(row=0, column=1, padx=5, pady=2, sticky="w")
+
+        simple_value_entry = ctk.CTkEntry(effect_frame)
+        dynamic_value_frame = ctk.CTkFrame(effect_frame, fg_color="transparent")
         
-        ctk.CTkLabel(effect_frame, text="Value:").grid(row=1, column=0, padx=5, pady=2, sticky="w")
-        value_entry = ctk.CTkEntry(effect_frame)
-        value_entry.grid(row=1, column=1, padx=5, pady=2, sticky="ew")
-        if effect_data and 'value' in effect_data: value_entry.insert(0, str(effect_data['value']))
+        def toggle_value_type():
+            if dynamic_var.get() == "on":
+                simple_value_entry.grid_remove()
+                dynamic_value_frame.grid(row=2, column=0, columnspan=3, sticky="ew", padx=5)
+            else:
+                dynamic_value_frame.grid_remove()
+                simple_value_entry.grid(row=1, column=1, padx=5, pady=2, sticky="ew")
+        
+        dynamic_var = ctk.StringVar(value="off")
+        dynamic_checkbox = ctk.CTkCheckBox(effect_frame, text="Use Dynamic Value", variable=dynamic_var, onvalue="on", offvalue="off", command=toggle_value_type)
+        dynamic_checkbox.grid(row=1, column=0, padx=5, pady=2, sticky="w")
 
-        # --- NEW: Condition Logic Dropdown ---
-        ctk.CTkLabel(effect_frame, text="Condition Logic:").grid(row=2, column=0, padx=5, pady=2, sticky="w")
+        ctk.CTkLabel(dynamic_value_frame, text="Base Value:").grid(row=0, column=0, padx=5, pady=2, sticky="w")
+        base_value_entry = ctk.CTkEntry(dynamic_value_frame, width=100)
+        base_value_entry.grid(row=0, column=1, padx=5, pady=2, sticky="w")
+        
+        ctk.CTkLabel(dynamic_value_frame, text="Bonus per Star:").grid(row=1, column=0, padx=5, pady=2, sticky="w")
+        per_star_var = ctk.StringVar(value=STAR_TYPES_FOR_DROPDOWN[0])
+        per_star_menu = ctk.CTkOptionMenu(dynamic_value_frame, variable=per_star_var, values=STAR_TYPES_FOR_DROPDOWN)
+        per_star_menu.grid(row=1, column=1, padx=5, pady=2, sticky="w")
+        
+        ctk.CTkLabel(dynamic_value_frame, text="Add Value:").grid(row=2, column=0, padx=5, pady=2, sticky="w")
+        add_value_entry = ctk.CTkEntry(dynamic_value_frame, width=100)
+        add_value_entry.grid(row=2, column=1, padx=5, pady=2, sticky="w")
+
+        ctk.CTkLabel(effect_frame, text="Condition Logic:").grid(row=3, column=0, padx=5, pady=2, sticky="w")
         logic_var = ctk.StringVar(value=LOGIC_OPTIONS[0])
-        if effect_data and effect_data.get("condition_logic", "AND") == "OR":
-            logic_var.set(LOGIC_OPTIONS[1])
-        ctk.CTkOptionMenu(effect_frame, variable=logic_var, values=LOGIC_OPTIONS).grid(row=2, column=1, padx=5, pady=2, sticky="w")
-
+        ctk.CTkOptionMenu(effect_frame, variable=logic_var, values=LOGIC_OPTIONS).grid(row=3, column=1, padx=5, pady=2, sticky="w")
+        
         conditions_frame = ctk.CTkFrame(effect_frame, fg_color="transparent")
-        conditions_frame.grid(row=3, column=0, columnspan=3, sticky="ew", padx=5, pady=5)
+        conditions_frame.grid(row=4, column=0, columnspan=3, sticky="ew", padx=5, pady=5)
         ctk.CTkLabel(conditions_frame, text="Conditions:").pack(anchor="w")
         ctk.CTkButton(conditions_frame, text="+ Add Condition", height=20, command=lambda p=conditions_frame: self._add_condition_row(p)).pack(anchor="w", pady=2)
         
-        effect_frame.widgets = {'effect_type': effect_type_var, 'value': value_entry, 'logic': logic_var, 'conditions': []}
-        if effect_data and "condition" in effect_data:
-            for k, v in effect_data["condition"].items():
-                self._add_condition_row(conditions_frame, {"type": k, "value": v})
-        
+        effect_frame.widgets = {
+            'effect_type': effect_type_var, 'logic': logic_var, 'conditions': [],
+            'dynamic_var': dynamic_var, 'simple_value': simple_value_entry,
+            'base_value': base_value_entry, 'per_star': per_star_var, 'add_value': add_value_entry
+        }
+
+        if effect_data:
+            value = effect_data.get('value')
+            if isinstance(value, dict) and "base" in value:
+                dynamic_var.set("on")
+                base_value_entry.insert(0, str(value.get("base", "")))
+                if "dynamic_bonus" in value:
+                    per_star_var.set(value["dynamic_bonus"].get("per_activated_star", STAR_TYPES_FOR_DROPDOWN[0]))
+                    add_value_entry.insert(0, str(value["dynamic_bonus"].get("add", "")))
+            else:
+                simple_value_entry.insert(0, str(value if value is not None else ""))
+
+            if effect_data.get("condition_logic", "AND") == "OR": logic_var.set(LOGIC_OPTIONS[1])
+            if "condition" in effect_data:
+                for k, v in effect_data["condition"].items(): self._add_condition_row(conditions_frame, {"type": k, "value": v})
+
+        toggle_value_type()
         self.effect_widgets[key]['effects'].append(effect_frame)
 
     def _remove_effect_frame(self, frame_to_remove, key):
@@ -178,20 +216,67 @@ class ItemEditorApp(ctk.CTk):
             for child in parent.pack_slaves(): child.pack_forget()
             for child in children: child.pack(pady=5, padx=5, fill="x", expand=True)
 
+    # --- MODIFIED: Major rewrite for dynamic condition widgets ---
+    def _update_condition_value_widget(self, widgets):
+        cond_type = widgets['type_var'].get()
+        
+        # Clear existing value widget
+        if widgets.get('value_widget'):
+            widgets['value_widget'].destroy()
+
+        # Create new widget based on type
+        if cond_type == 'requires_element':
+            options = [e.name for e in Element]
+            var = ctk.StringVar(value=options[0])
+            widget = ctk.CTkOptionMenu(widgets['value_frame'], variable=var, values=options)
+            widgets['value_var'] = var
+        elif cond_type == 'requires_type':
+            options = [t.name for t in ItemType]
+            var = ctk.StringVar(value=options[0])
+            widget = ctk.CTkOptionMenu(widgets['value_frame'], variable=var, values=options)
+            widgets['value_var'] = var
+        elif cond_type in BOOL_CONDITIONS:
+            options = ["True", "False"]
+            var = ctk.StringVar(value=options[0])
+            widget = ctk.CTkOptionMenu(widgets['value_frame'], variable=var, values=options)
+            widgets['value_var'] = var
+        else: # Default to Entry (for requires_name)
+            widget = ctk.CTkEntry(widgets['value_frame'])
+            widgets['value_entry'] = widget
+        
+        widget.pack(expand=True, fill="x")
+        widgets['value_widget'] = widget
+
     def _add_condition_row(self, parent, condition_data=None):
         condition_row = ctk.CTkFrame(parent)
         condition_row.pack(fill="x", pady=2)
+
+        type_var = ctk.StringVar(value=CONDITION_TYPES[0])
+        type_menu = ctk.CTkOptionMenu(condition_row, variable=type_var, values=CONDITION_TYPES)
+        type_menu.pack(side="left", padx=5)
         
-        cond_type_var = ctk.StringVar(value=condition_data.get("type", CONDITION_TYPES[0]) if condition_data else CONDITION_TYPES[0])
-        ctk.CTkOptionMenu(condition_row, variable=cond_type_var, values=CONDITION_TYPES).pack(side="left", padx=5)
-        
-        cond_value_entry = ctk.CTkEntry(condition_row)
-        cond_value_entry.pack(side="left", padx=5, expand=True, fill="x")
-        if condition_data and "value" in condition_data: cond_value_entry.insert(0, str(condition_data["value"]))
+        value_frame = ctk.CTkFrame(condition_row, fg_color="transparent")
+        value_frame.pack(side="left", padx=5, expand=True, fill="x")
         
         ctk.CTkButton(condition_row, text="x", width=25, command=condition_row.destroy).pack(side="right", padx=5)
         
-        parent.master.widgets['conditions'].append({'type': cond_type_var, 'value': cond_value_entry, 'frame': condition_row})
+        widgets = {'frame': condition_row, 'type_var': type_var, 'value_frame': value_frame}
+        type_var.trace_add("write", lambda *args, w=widgets: self._update_condition_value_widget(w))
+
+        # Initialize with data if provided
+        if condition_data:
+            type_var.set(condition_data.get("type", CONDITION_TYPES[0]))
+        
+        self._update_condition_value_widget(widgets) # Create the initial correct widget
+
+        if condition_data:
+            value = str(condition_data.get("value", ""))
+            if 'value_var' in widgets:
+                widgets['value_var'].set(value)
+            elif 'value_entry' in widgets:
+                widgets['value_entry'].insert(0, value)
+
+        parent.master.widgets['conditions'].append(widgets)
 
     def create_item_list_widgets(self):
         ctk.CTkLabel(self.item_list_frame, text="Items", font=("", 18, "bold")).pack(pady=(10,5))
@@ -270,6 +355,7 @@ class ItemEditorApp(ctk.CTk):
                 self.shape_matrix_data[r][c] = val
                 self.grid_buttons[r][c].configure(fg_color=GRID_COLORS[val])
 
+    # --- MODIFIED: Handles saving of new dynamic condition widgets ---
     def save_item(self):
         item_name = self.name_entry.get()
         if not item_name: return
@@ -296,16 +382,26 @@ class ItemEditorApp(ctk.CTk):
             scroll_frame = self.effect_widgets[key]['scroll_frame']
             for w in scroll_frame.pack_slaves():
                 if isinstance(w, ctk.CTkFrame) and hasattr(w, 'widgets'):
-                    value_str = w.widgets['value'].get()
-                    try: value = eval(value_str)
-                    except (NameError, SyntaxError): value = value_str
+                    value = None
+                    if w.widgets['dynamic_var'].get() == 'on':
+                        try:
+                            base = float(w.widgets['base_value'].get())
+                            add = float(w.widgets['add_value'].get())
+                            per_star = w.widgets['per_star'].get()
+                            value = {"base": base, "dynamic_bonus": {"add": add, "per_activated_star": per_star}}
+                        except ValueError: value = {"base": 0.0}
+                    else:
+                        value_str = w.widgets['simple_value'].get()
+                        try: value = eval(value_str)
+                        except (NameError, SyntaxError): value = value_str
                     
                     logic_str = "AND" if w.widgets['logic'].get() == LOGIC_OPTIONS[0] else "OR"
                     effect_data = {"effect": w.widgets['effect_type'].get(), "value": value, "condition_logic": logic_str, "condition": {}}
                     
                     for cond in w.widgets['conditions']:
                         if cond['frame'].winfo_exists():
-                            cond_type = cond['type'].get(); cond_val_str = cond['value'].get()
+                            cond_type = cond['type_var'].get()
+                            cond_val_str = cond['value_widget'].get()
                             try: cond_val = eval(cond_val_str)
                             except (NameError, SyntaxError): cond_val = cond_val_str
                             effect_data["condition"][cond_type] = cond_val

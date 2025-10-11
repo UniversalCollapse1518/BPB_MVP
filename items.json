@@ -223,5 +223,198 @@
         }
       ]
     }
+  },
+  "BlackScroll": {
+    "name": "Black Scroll",
+    "rarity": "GODLY",
+    "item_class": "MAGE",
+    "elements": [
+      "DARK",
+      "MAGIC"
+    ],
+    "types": [
+      "SPELL"
+    ],
+    "base_score": -5,
+    "has_cooldown": true,
+    "is_start_of_battle": false,
+    "shape_matrix": [
+      [
+        0,
+        0,
+        2,
+        0,
+        0
+      ],
+      [
+        3,
+        0,
+        0,
+        3,
+        2
+      ],
+      [
+        0,
+        0,
+        1,
+        1,
+        0
+      ],
+      [
+        2,
+        3,
+        0,
+        0,
+        3
+      ],
+      [
+        0,
+        0,
+        0,
+        2,
+        0
+      ]
+    ],
+    "passive_effects": [],
+    "star_effects": {
+      "STAR_A_1": [
+        {
+          "effect": "MULTIPLY_SCORE_OF_TARGET",
+          "value": {
+            "base": 1.3,
+            "dynamic_bonus": {
+              "add": 0.05,
+              "per_activated_star": "STAR_B"
+            }
+          },
+          "condition_logic": "AND",
+          "condition": {
+            "requires_cooldown": true
+          }
+        },
+        {
+          "effect": "ADD_SCORE_TO_SELF",
+          "value": "",
+          "condition_logic": "AND",
+          "condition": {}
+        }
+      ],
+      "STAR_A_2": [
+        {
+          "effect": "ADD_SCORE_TO_TARGET",
+          "value": 20,
+          "condition_logic": "AND",
+          "condition": {
+            "requires_name": "Bird"
+          }
+        }
+      ],
+      "STAR_B_1": [
+        {
+          "effect": "ADD_SCORE_TO_SELF",
+          "value": "",
+          "condition_logic": "AND",
+          "condition": {
+            "requires_element": "DARK"
+          }
+        }
+      ]
+    }
+  },
+  "Bird": {
+    "name": "Bird",
+    "rarity": "LEGENDARY",
+    "item_class": "NEUTRAL",
+    "elements": [
+      "MUSICAL",
+      "NATURE"
+    ],
+    "types": [
+      "PET"
+    ],
+    "base_score": 5,
+    "has_cooldown": false,
+    "is_start_of_battle": false,
+    "shape_matrix": [
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        2
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        2,
+        2
+      ],
+      [
+        0,
+        0,
+        0,
+        2,
+        2,
+        2
+      ],
+      [
+        0,
+        1,
+        2,
+        2,
+        2,
+        2
+      ],
+      [
+        1,
+        1,
+        0,
+        2,
+        2,
+        2
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        2,
+        2
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        2
+      ]
+    ],
+    "passive_effects": [],
+    "star_effects": {
+      "STAR_A_1": [
+        {
+          "effect": "MULTIPLY_SCORE_OF_TARGET",
+          "value": 1.15,
+          "condition_logic": "AND",
+          "condition": {
+            "requires_cooldown": true
+          }
+        }
+      ],
+      "STAR_A_2": [
+        {
+          "effect": "ADD_SCORE_TO_TARGET",
+          "value": 20,
+          "condition_logic": "AND",
+          "condition": {
+            "requires_name": "Black Scroll"
+          }
+        }
+      ]
+    }
   }
 }
