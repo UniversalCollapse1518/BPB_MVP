@@ -54,7 +54,6 @@ def load_items_from_file(filepath: str) -> List[Item]:
 def discover_solvers() -> Dict[str, Type[BaseSolver]]:
     solvers = {}
     solver_dir = 'solvers'
-    # Format a display name from a class name, e.g., 'GeneticSolver' -> 'Genetic'
     def format_name(name):
         return name.replace('Solver', '')
 
@@ -163,7 +162,6 @@ def game_loop():
                             print("Solver Error: No items in the backpack to solve for.")
                         else:
                             SolverClass = available_solvers[selected_solver_name]
-                            # --- MODIFIED: Pass the current layout to the solver ---
                             solver_instance = SolverClass(items_in_backpack, BACKPACK_COLS, BACKPACK_ROWS, initial_layout=placed_items)
                             print(f"Running {selected_solver_name} Solver...")
                             best_layout, best_score = solver_instance.solve()
@@ -253,19 +251,27 @@ def game_loop():
 
         all_items = [(item, (BACKPACK_X + item.gx * GRID_SIZE, BACKPACK_Y + item.gy * GRID_SIZE)) for item in placed_items.values()]
         for item in items_in_shop: item.rect.y=item.base_y-shop_scroll_y; all_items.append((item, item.rect.topleft))
-        for item, pos in all_items:
-            if pos[0] < SHOP_X: screen.blit(item.body_image, pos)
-            elif shop_area_rect.colliderect(pygame.Rect(pos, item.body_image.get_size())): screen.blit(item.body_image, pos)
+        
+        # --- MODIFIED: Separate star drawing from body drawing ---
+        hovered_item_to_draw_stars = None
+        
+        # First, draw all item bodies with correct clipping
         for item, pos in all_items:
             if item.is_mouse_over_body(mouse_pos, pos):
-                is_in_shop = shop_area_rect.colliderect(pygame.Rect(pos, item.body_image.get_size()))
-                if is_in_shop: screen.set_clip(shop_area_rect)
-                item.draw_stars(screen, pos)
-                if is_in_shop: screen.set_clip(None)
+                hovered_item_to_draw_stars = (item, pos)
+
+            if pos[0] < SHOP_X: # Item is in the backpack area
+                screen.blit(item.body_image, pos)
+            elif shop_area_rect.colliderect(pygame.Rect(pos, item.body_image.get_size())):
+                screen.set_clip(shop_area_rect)
+                screen.blit(item.body_image, pos)
+                screen.set_clip(None)
 
         if selected_item and selected_item.dragging:
             screen.blit(selected_item.body_image, selected_item.rect)
+            # We still want dragged items' stars to be on top, but not clipped
             selected_item.draw_stars(screen, selected_item.rect.topleft)
+            
             gx = round((selected_item.rect.left - BACKPACK_X) / GRID_SIZE)
             gy = round((selected_item.rect.top - BACKPACK_Y) / GRID_SIZE)
             if not is_placement_valid(selected_item, gx, gy, placed_items):
@@ -278,15 +284,9 @@ def game_loop():
         pygame.draw.rect(screen, (220, 220, 220), dropdown_rect); pygame.draw.rect(screen, (180, 180, 180), dropdown_rect, 2)
         dropdown_text = font_button.render(f"Solver: {selected_solver_name} ▼", True, FONT_COLOR)
         screen.blit(dropdown_text, dropdown_text.get_rect(center=dropdown_rect.center))
-        if dropdown_open:
-            for i, name in enumerate(solver_names):
-                option_rect = pygame.Rect(dropdown_rect.left, dropdown_rect.bottom + i * 30, dropdown_rect.width, 30)
-                pygame.draw.rect(screen, (240, 240, 240), option_rect); pygame.draw.rect(screen, (180, 180, 180), option_rect, 1)
-                option_text = font_button.render(name, True, FONT_COLOR)
-                screen.blit(option_text, (option_rect.x + 10, option_rect.centery - option_text.get_height() // 2))
         
-        pygame.draw.rect(screen, (180, 180, 220), run_solver_button)
         run_text = font_button.render("Run Solver", True, FONT_COLOR)
+        pygame.draw.rect(screen, (180, 180, 220), run_solver_button)
         screen.blit(run_text, run_text.get_rect(center=run_solver_button.center))
 
         debug_y_offset = dropdown_rect.bottom + 40
@@ -303,6 +303,19 @@ def game_loop():
                 screen.blit(font_small.render(line_text, True, FONT_COLOR), (bp_rect.left + 15, debug_y_offset)); debug_y_offset += 25
         else:
             screen.blit(font_small.render("  None", True, FONT_COLOR), (bp_rect.left + 15, debug_y_offset)); debug_y_offset += 25
+            
+        # --- MODIFIED: Draw stars last so they are on top of everything ---
+        if hovered_item_to_draw_stars and not selected_item:
+            item, pos = hovered_item_to_draw_stars
+            item.draw_stars(screen, pos)
+
+        # Dropdown options need to be drawn after stars to be on top of them
+        if dropdown_open:
+            for i, name in enumerate(solver_names):
+                option_rect = pygame.Rect(dropdown_rect.left, dropdown_rect.bottom + i * 30, dropdown_rect.width, 30)
+                pygame.draw.rect(screen, (240, 240, 240), option_rect); pygame.draw.rect(screen, (180, 180, 180), option_rect, 1)
+                option_text = font_button.render(name, True, FONT_COLOR)
+                screen.blit(option_text, (option_rect.x + 10, option_rect.centery - option_text.get_height() // 2))
 
         pygame.display.flip()
         clock.tick(60)
@@ -312,3 +325,4 @@ def game_loop():
 
 if __name__ == "__main__":
     game_loop()
+

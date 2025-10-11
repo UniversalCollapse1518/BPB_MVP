@@ -10,7 +10,6 @@ class Item(pygame.sprite.Sprite):
                  shape_matrix: List[List[GridType]], base_score: int, star_effects: dict,
                  has_cooldown: bool = False, is_start_of_battle: bool = False, passive_effects: List[dict] = None):
         super().__init__()
-        # ... (initialization code is the same) ...
         self.name = name
         self.rarity = rarity
         self.item_class = item_class
@@ -41,11 +40,9 @@ class Item(pygame.sprite.Sprite):
         self.occupying_stars = []
         self.temporary_elements = []
         
-        # --- NEW: Cache for body bounds ---
         self._body_bounds = None
 
     def clone(self):
-        # ... (clone method is the same) ...
         new_item = Item(
             x=self.rect.x, y=self.rect.y, name=self.name, rarity=self.rarity, item_class=self.item_class,
             elements=list(self.elements), types=list(self.types), shape_matrix=copy.deepcopy(self.shape_matrix),
@@ -55,7 +52,6 @@ class Item(pygame.sprite.Sprite):
         new_item.gx, new_item.gy = self.gx, self.gy
         return new_item
 
-    # --- NEW: Method to get the bounding box of only the body parts ---
     def get_body_bounds(self) -> Optional[Tuple[int, int, int, int]]:
         """Returns (min_r, min_c, max_r, max_c) for OCCUPIED cells."""
         if self._body_bounds:
@@ -82,7 +78,6 @@ class Item(pygame.sprite.Sprite):
         bounds = self.get_body_bounds()
         return (bounds[1], bounds[0]) if bounds else (0, 0)
     
-    # ... (create_body_surface and draw_stars are the same) ...
     def create_body_surface(self, grid_size, rarity_colors, font_color):
         width_px, height_px = self.grid_width * grid_size, self.grid_height * grid_size
         surface = pygame.Surface((width_px, height_px), pygame.SRCALPHA)
@@ -120,18 +115,16 @@ class Item(pygame.sprite.Sprite):
                 if cell == GridType.OCCUPIED and pygame.Rect(current_pos[0]+c*GRID_SIZE, current_pos[1]+r*GRID_SIZE, GRID_SIZE, GRID_SIZE).collidepoint(mouse_pos):
                     return True
         return False
-
+        
     def rotate(self):
         self.shape_matrix = [list(row)[::-1] for row in zip(*self.shape_matrix)]
         self.grid_height, self.grid_width = len(self.shape_matrix), len(self.shape_matrix[0])
         from main import GRID_SIZE, RARITY_BORDER_COLORS, FONT_COLOR
         self.body_image = self.create_body_surface(GRID_SIZE, RARITY_BORDER_COLORS, FONT_COLOR)
-        # --- NEW: Invalidate cache on rotation ---
         self._body_bounds = None
 
-# ... (rest of engine.py is unchanged)
 class CalculationEngine:
-    # ... (rest of the CalculationEngine class is unchanged) ...
+    # ... (check_condition and get_effect_value are unchanged) ...
     def _check_condition(self, condition_data: dict, source_item: Item, target_item: Optional[Item], condition_logic: str = "AND") -> bool:
         if not condition_data:
             return True
@@ -195,8 +188,8 @@ class CalculationEngine:
             num_activated = source_item.activated_stars.get(per_star_type, 0)
             final_value += num_activated * bonus_data.get("add", 0)
         return final_value
-
     def run(self, placed_items: Dict[Any, Item], backpack_cols: int, backpack_rows: int):
+        # ... (initial setup is unchanged) ...
         occupancy_grid: List[List[Optional[Item]]] = [[None for _ in range(backpack_cols)] for _ in range(backpack_rows)]
         for item in placed_items.values():
             item.final_score = item.base_score
@@ -211,6 +204,7 @@ class CalculationEngine:
                         occupancy_grid[gy+r][gx+c] = item
 
         for source_item in placed_items.values():
+            # ... (element adding loop is unchanged) ...
             gx, gy = source_item.gx, source_item.gy
             for r, row in enumerate(source_item.shape_matrix):
                 for c, cell_type in enumerate(row):
@@ -228,7 +222,6 @@ class CalculationEngine:
                                     logic = effect_data.get("condition_logic", "AND")
                                     if effect_data.get("effect") == "ADD_ELEMENT_TO_TARGET" and self._check_condition(effect_data.get("condition", {}), source_item, target_item, logic):
                                         if target_item:
-                                            # Ensure value is a valid Element name
                                             try:
                                                 element_to_add = Element[effect_data["value"].upper()]
                                                 if element_to_add not in target_item.temporary_elements:
@@ -236,21 +229,25 @@ class CalculationEngine:
                                             except (KeyError, AttributeError):
                                                 print(f"Warning: Invalid element '{effect_data['value']}' for ADD_ELEMENT_TO_TARGET in {source_item.name}")
                                         break
-
+        
         for source_item in placed_items.values():
             gx, gy = source_item.gx, source_item.gy
             triggered_by = {GridType.STAR_A: set(), GridType.STAR_B: set(), GridType.STAR_C: set()}
             for r, row in enumerate(source_item.shape_matrix):
                 for c, cell_type in enumerate(row):
                     if cell_type in triggered_by:
+                        # --- MODIFIED: Add boundary check for star activation ---
+                        abs_x, abs_y = gx + c, gy + r
+                        if not(0 <= abs_x < backpack_cols and 0 <= abs_y < backpack_rows):
+                            continue # Skip stars outside the backpack
+
                         base_star_name = cell_type.name
                         for star_key in source_item.star_effects:
                             if star_key.startswith(base_star_name):
                                 effects = source_item.star_effects.get(star_key, [])
                                 if not isinstance(effects, list): effects = [effects]
                                 
-                                abs_x, abs_y = gx + c, gy + r
-                                target_item = occupancy_grid[abs_y][abs_x] if 0 <= abs_y < backpack_rows and 0 <= abs_x < backpack_cols else None
+                                target_item = occupancy_grid[abs_y][abs_x]
                                 
                                 for effect_data in effects:
                                     logic = effect_data.get("condition_logic", "AND")
@@ -267,7 +264,6 @@ class CalculationEngine:
         for source_item in placed_items.values():
             for effect_data in source_item.passive_effects:
                 logic = effect_data.get("condition_logic", "AND")
-                # Passive effects can't target empty, so we check every item
                 for target_item in placed_items.values():
                     if self._check_condition(effect_data.get("condition", {}), source_item, target_item, logic):
                         value = self._get_effect_value(effect_data, source_item)
@@ -279,9 +275,13 @@ class CalculationEngine:
             for r, row in enumerate(source_item.shape_matrix):
                 for c, cell_type in enumerate(row):
                     if cell_type in triggered_targets:
+                        # --- MODIFIED: Add boundary check for score effects ---
                         abs_x, abs_y = gx + c, gy + r
-                        target_item = occupancy_grid[abs_y][abs_x] if 0 <= abs_y < backpack_rows and 0 <= abs_x < backpack_cols else None
+                        if not(0 <= abs_x < backpack_cols and 0 <= abs_y < backpack_rows):
+                            continue # Skip stars outside the backpack
 
+                        target_item = occupancy_grid[abs_y][abs_x]
+                        
                         is_duplicate = False
                         if target_item is not None:
                             if target_item in triggered_targets[cell_type]: is_duplicate = True
@@ -310,14 +310,14 @@ class CalculationEngine:
                                         break
                                 if effect_applied_for_this_cell: break
         
-        # --- MODIFIED: Added try-except blocks to safely convert values to float ---
+        # ... (final score calculation loops are unchanged) ...
         for effect_type in ["ADD_SCORE_TO_SELF", "ADD_SCORE_TO_TARGET"]:
             for eff in all_effects:
                 if eff["effect"] == effect_type:
                     try:
                         numeric_value = float(eff["value"])
                     except (ValueError, TypeError):
-                        continue # Skip if value is not a number
+                        continue 
 
                     if eff["effect"] == "ADD_SCORE_TO_SELF":
                         reason_text = eff.get("reason", "self")
@@ -333,7 +333,7 @@ class CalculationEngine:
                     try:
                         numeric_value = float(eff["value"])
                     except (ValueError, TypeError):
-                        continue # Skip if value is not a number
+                        continue
 
                     if eff["effect"] == "MULTIPLY_SCORE_OF_SELF":
                         reason_text = eff.get("reason", "self")

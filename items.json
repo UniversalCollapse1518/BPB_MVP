@@ -458,5 +458,198 @@
     ],
     "passive_effects": [],
     "star_effects": {}
+  },
+  "Blueberry": {
+    "name": "Blueberry",
+    "rarity": "RARE",
+    "item_class": "NEUTRAL",
+    "elements": [
+      "MAGIC",
+      "NATURE"
+    ],
+    "types": [
+      "FOOD"
+    ],
+    "base_score": 5,
+    "has_cooldown": true,
+    "is_start_of_battle": false,
+    "shape_matrix": [
+      [
+        0,
+        2,
+        0
+      ],
+      [
+        2,
+        1,
+        2
+      ],
+      [
+        0,
+        2,
+        0
+      ]
+    ],
+    "passive_effects": [],
+    "star_effects": {
+      "STAR_A_1": [
+        {
+          "effect": "MULTIPLY_SCORE_OF_SELF",
+          "value": 1.1,
+          "condition_logic": "AND",
+          "condition": {
+            "must_be_different": true,
+            "requires_type": "FOOD"
+          }
+        }
+      ]
+    }
+  },
+  "Garlic": {
+    "name": "Garlic",
+    "rarity": "COMMON",
+    "item_class": "NEUTRAL",
+    "elements": [
+      "NATURE"
+    ],
+    "types": [
+      "FOOD"
+    ],
+    "base_score": 3,
+    "has_cooldown": true,
+    "is_start_of_battle": false,
+    "shape_matrix": [
+      [
+        0,
+        2,
+        0
+      ],
+      [
+        2,
+        1,
+        2
+      ],
+      [
+        2,
+        1,
+        2
+      ],
+      [
+        0,
+        2,
+        0
+      ]
+    ],
+    "passive_effects": [],
+    "star_effects": {
+      "STAR_A_1": [
+        {
+          "effect": "MULTIPLY_SCORE_OF_SELF",
+          "value": 1.1,
+          "condition_logic": "AND",
+          "condition": {
+            "must_be_different": true,
+            "requires_type": "FOOD"
+          }
+        }
+      ]
+    }
+  },
+  "Redbook": {
+    "name": "Red book",
+    "rarity": "COMMON",
+    "item_class": "MAGE",
+    "elements": [
+      "MAGIC"
+    ],
+    "types": [
+      "BOOK"
+    ],
+    "base_score": 10,
+    "has_cooldown": true,
+    "is_start_of_battle": false,
+    "shape_matrix": [
+      [
+        0,
+        2,
+        0
+      ],
+      [
+        2,
+        1,
+        2
+      ],
+      [
+        2,
+        1,
+        2
+      ],
+      [
+        0,
+        2,
+        0
+      ]
+    ],
+    "passive_effects": [],
+    "star_effects": {
+      "STAR_A_1": [
+        {
+          "effect": "ADD_SCORE_TO_SELF",
+          "value": 6,
+          "condition_logic": "AND",
+          "condition": {
+            "requires_type": "SPELL"
+          }
+        }
+      ]
+    }
+  },
+  "WhiteScroll": {
+    "name": "White Scroll",
+    "rarity": "EPIC",
+    "item_class": "MAGE",
+    "elements": [
+      "HOLY",
+      "MAGIC"
+    ],
+    "types": [
+      "SPELL"
+    ],
+    "base_score": 15,
+    "has_cooldown": true,
+    "is_start_of_battle": false,
+    "shape_matrix": [
+      [
+        0,
+        2,
+        2,
+        0
+      ],
+      [
+        2,
+        2,
+        2,
+        2
+      ],
+      [
+        0,
+        1,
+        1,
+        0
+      ]
+    ],
+    "passive_effects": [],
+    "star_effects": {
+      "STAR_A_1": [
+        {
+          "effect": "MULTIPLY_SCORE_OF_SELF",
+          "value": 1.1,
+          "condition_logic": "AND",
+          "condition": {
+            "requires_element": "HOLY"
+          }
+        }
+      ]
+    }
   }
 }

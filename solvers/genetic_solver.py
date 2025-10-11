@@ -10,7 +10,7 @@ class GeneticSolver(BaseSolver):
     Algorithm D: A Genetic Algorithm to find an optimal backpack layout.
     """
     def __init__(self, items: List[Item], backpack_cols: int, backpack_rows: int,
-                 population_size: int = 150, generations: int = 200, mutation_rate: float = 0.08,
+                 population_size: int = 50, generations: int = 100, mutation_rate: float = 0.08,
                  tournament_size: int = 7, elitism_count: int = 5, initial_layout: Optional[Dict] = None):
         super().__init__(items, backpack_cols, backpack_rows)
         self.population_size = population_size
