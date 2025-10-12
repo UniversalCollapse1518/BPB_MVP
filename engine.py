@@ -28,6 +28,7 @@ class Item(pygame.sprite.Sprite):
         from main import GRID_SIZE, RARITY_BORDER_COLORS, FONT_COLOR
         self.body_image = self.create_body_surface(GRID_SIZE, RARITY_BORDER_COLORS, FONT_COLOR)
         self.rect = self.body_image.get_rect(topleft=(x, y))
+
         self.base_y = y
         self.dragging = False
 
@@ -44,7 +45,8 @@ class Item(pygame.sprite.Sprite):
 
     def clone(self):
         new_item = Item(
-            x=self.rect.x, y=self.rect.y, name=self.name, rarity=self.rarity, item_class=self.item_class,
+            x=self.rect.x if self.rect else 0, y=self.rect.y if self.rect else 0, 
+            name=self.name, rarity=self.rarity, item_class=self.item_class,
             elements=list(self.elements), types=list(self.types), shape_matrix=copy.deepcopy(self.shape_matrix),
             base_score=self.base_score, star_effects=copy.deepcopy(self.star_effects), has_cooldown=self.has_cooldown,
             is_start_of_battle=self.is_start_of_battle, passive_effects=copy.deepcopy(self.passive_effects)
@@ -53,25 +55,15 @@ class Item(pygame.sprite.Sprite):
         return new_item
 
     def get_body_bounds(self) -> Optional[Tuple[int, int, int, int]]:
-        """Returns (min_r, min_c, max_r, max_c) for OCCUPIED cells."""
-        if self._body_bounds:
-            return self._body_bounds
-
-        min_r, max_r = self.grid_height, -1
-        min_c, max_c = self.grid_width, -1
+        if self._body_bounds: return self._body_bounds
+        min_r, max_r, min_c, max_c = self.grid_height, -1, self.grid_width, -1
         found_body = False
         for r, row in enumerate(self.shape_matrix):
             for c, cell in enumerate(row):
                 if cell == GridType.OCCUPIED:
                     found_body = True
-                    min_r = min(min_r, r)
-                    max_r = max(max_r, r)
-                    min_c = min(min_c, c)
-                    max_c = max(max_c, c)
-        
-        if found_body:
-            self._body_bounds = (min_r, min_c, max_r, max_c)
-            return self._body_bounds
+                    min_r, max_r, min_c, max_c = min(min_r, r), max(max_r, r), min(min_c, c), max(max_c, c)
+        if found_body: self._body_bounds = (min_r, min_c, max_r, max_c); return self._body_bounds
         return None
 
     def get_body_offset(self) -> Tuple[int, int]:
@@ -112,7 +104,7 @@ class Item(pygame.sprite.Sprite):
         from main import GRID_SIZE
         for r, row in enumerate(self.shape_matrix):
             for c, cell in enumerate(row):
-                if cell == GridType.OCCUPIED and pygame.Rect(current_pos[0]+c*GRID_SIZE, current_pos[1]+r*GRID_SIZE, GRID_SIZE, GRID_SIZE).collidepoint(mouse_pos):
+                if cell == GridType.OCCUPIED and self.rect and pygame.Rect(current_pos[0]+c*GRID_SIZE, current_pos[1]+r*GRID_SIZE, GRID_SIZE, GRID_SIZE).collidepoint(mouse_pos):
                     return True
         return False
         
@@ -121,7 +113,10 @@ class Item(pygame.sprite.Sprite):
         self.grid_height, self.grid_width = len(self.shape_matrix), len(self.shape_matrix[0])
         from main import GRID_SIZE, RARITY_BORDER_COLORS, FONT_COLOR
         self.body_image = self.create_body_surface(GRID_SIZE, RARITY_BORDER_COLORS, FONT_COLOR)
+        # Recreate the rect to get the new dimensions
+        self.rect = self.body_image.get_rect()
         self._body_bounds = None
+
 
 class CalculationEngine:
     # ... (check_condition and get_effect_value are unchanged) ...

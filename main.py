@@ -6,12 +6,19 @@ import os
 import importlib.util
 import inspect
 from typing import List, Dict, Tuple, Type
+from tkinter import filedialog
+import tkinter as tk
+from datetime import datetime
 
 from definitions import GridType, Rarity, ItemClass, Element, ItemType
 from engine import Item, CalculationEngine
 # Make sure the solvers can be found
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 from solvers.base_solver import BaseSolver
+
+# --- Setup for tkinter file dialogs ---
+root = tk.Tk()
+root.withdraw()
 
 # Layout and new UI constants
 SCREEN_WIDTH = 1366
@@ -33,6 +40,72 @@ GRID_LINE_COLOR = (200, 200, 200)
 INVALID_PLACEMENT_COLOR = (255, 0, 0, 100)
 RARITY_BORDER_COLORS = { Rarity.COMMON: (150, 150, 150), Rarity.RARE: (0, 100, 255), Rarity.EPIC: (138, 43, 226), Rarity.LEGENDARY: (255, 165, 0), Rarity.GODLY: (255, 215, 0), Rarity.UNIQUE: (255, 20, 147) }
 STAR_SHAPE_COLORS = { GridType.STAR_A: (255, 215, 0), GridType.STAR_B: (50, 205, 50), GridType.STAR_C: (148, 0, 211) }
+
+def save_layout(placed_items: Dict):
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    default_filename = f"layout_{timestamp}.json"
+    filepath = filedialog.asksaveasfilename(
+        initialfile=default_filename,
+        defaultextension=".json",
+        filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+        title="Save Backpack Layout"
+    )
+    if not filepath:
+        return
+
+    layout_data = []
+    for item in placed_items.values():
+        layout_data.append({
+            "name": item.name,
+            "gx": item.gx,
+            "gy": item.gy,
+            "shape_matrix": [[c.value for c in r] for r in item.shape_matrix]
+        })
+    
+    with open(filepath, 'w') as f:
+        json.dump(layout_data, f, indent=2)
+    print(f"Layout saved to {filepath}")
+
+def load_layout(full_item_data: Dict) -> Dict:
+    filepath = filedialog.askopenfilename(
+        filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+        title="Load Backpack Layout"
+    )
+    if not filepath:
+        return {}
+
+    new_placed_items = {}
+    try:
+        with open(filepath, 'r') as f:
+            layout_data = json.load(f)
+
+        for item_info in layout_data:
+            item_name = item_info["name"]
+            base_item_data = next((data for data in full_item_data.values() if data['name'] == item_name), None)
+            
+            if base_item_data:
+                item = Item(0, 0, item_name, Rarity[base_item_data['rarity']],
+                            ItemClass[base_item_data['item_class']], 
+                            [Element[e] for e in base_item_data.get('elements', [])],
+                            [ItemType[t] for t in base_item_data.get('types', [])],
+                            [[GridType(c) for c in r] for r in item_info['shape_matrix']],
+                            base_item_data.get('base_score', 0), 
+                            base_item_data.get('star_effects', {}),
+                            base_item_data.get('has_cooldown', False), 
+                            base_item_data.get('is_start_of_battle', False),
+                            base_item_data.get('passive_effects', []))
+                
+                item.gx = item_info["gx"]
+                item.gy = item_info["gy"]
+                key = (item.gx + item.get_body_offset()[1], item.gy + item.get_body_offset()[0])
+                new_placed_items[key] = item
+    except Exception as e:
+        print(f"Error loading layout: {e}")
+        return {}
+    
+    print(f"Layout loaded from {filepath}")
+    return new_placed_items
+
 
 def load_items_from_file(filepath: str) -> List[Item]:
     items = []
@@ -91,7 +164,10 @@ def game_loop():
     pygame.display.set_caption("Backpack Battles - Final Scoring Engine")
     clock = pygame.time.Clock()
 
+    with open('items.json', 'r') as f:
+        full_item_definitions = json.load(f)
     items_in_shop = load_items_from_file('items.json')
+
     placed_items = {}
     selected_item = None
     engine = CalculationEngine()
@@ -110,6 +186,10 @@ def game_loop():
     dropdown_rect = pygame.Rect(BACKPACK_X, dropdown_y, dropdown_width, 40)
     run_solver_button = pygame.Rect(dropdown_rect.right + 10, dropdown_y, 130, 40)
     dropdown_open = False
+
+    save_load_y = run_solver_button.bottom + 10
+    save_button = pygame.Rect(BACKPACK_X, save_load_y, 175, 40)
+    load_button = pygame.Rect(save_button.right + 10, save_load_y, 175, 40)
 
     shop_area_rect = pygame.Rect(SHOP_X, PANEL_Y, SHOP_WIDTH, PANEL_HEIGHT)
     info_panel_rect = pygame.Rect(INFO_PANEL_X, PANEL_Y, INFO_PANEL_WIDTH, PANEL_HEIGHT)
@@ -145,7 +225,15 @@ def game_loop():
                     nr = selected_item.body_image.get_rect(x=mouse_pos[0]-npx, y=mouse_pos[1]-npy)
                     selected_item.rect, offset_x, offset_y = nr, nr.x-mouse_pos[0], nr.y-mouse_pos[1]
                 elif event.button == 1:
-                    if dropdown_rect.collidepoint(mouse_pos):
+                    if save_button.collidepoint(mouse_pos):
+                        save_layout(placed_items)
+                        dropdown_open = False
+                    elif load_button.collidepoint(mouse_pos):
+                        placed_items = load_layout(full_item_definitions)
+                        engine.run(placed_items, BACKPACK_COLS, BACKPACK_ROWS)
+                        total_score = sum(item.final_score for item in placed_items.values())
+                        dropdown_open = False
+                    elif dropdown_rect.collidepoint(mouse_pos):
                         dropdown_open = not dropdown_open
                     elif dropdown_open:
                         for i, name in enumerate(solver_names):
@@ -252,15 +340,13 @@ def game_loop():
         all_items = [(item, (BACKPACK_X + item.gx * GRID_SIZE, BACKPACK_Y + item.gy * GRID_SIZE)) for item in placed_items.values()]
         for item in items_in_shop: item.rect.y=item.base_y-shop_scroll_y; all_items.append((item, item.rect.topleft))
         
-        # --- MODIFIED: Separate star drawing from body drawing ---
         hovered_item_to_draw_stars = None
         
-        # First, draw all item bodies with correct clipping
         for item, pos in all_items:
             if item.is_mouse_over_body(mouse_pos, pos):
                 hovered_item_to_draw_stars = (item, pos)
 
-            if pos[0] < SHOP_X: # Item is in the backpack area
+            if pos[0] < SHOP_X:
                 screen.blit(item.body_image, pos)
             elif shop_area_rect.colliderect(pygame.Rect(pos, item.body_image.get_size())):
                 screen.set_clip(shop_area_rect)
@@ -269,7 +355,6 @@ def game_loop():
 
         if selected_item and selected_item.dragging:
             screen.blit(selected_item.body_image, selected_item.rect)
-            # We still want dragged items' stars to be on top, but not clipped
             selected_item.draw_stars(screen, selected_item.rect.topleft)
             
             gx = round((selected_item.rect.left - BACKPACK_X) / GRID_SIZE)
@@ -289,6 +374,14 @@ def game_loop():
         pygame.draw.rect(screen, (180, 180, 220), run_solver_button)
         screen.blit(run_text, run_text.get_rect(center=run_solver_button.center))
 
+        pygame.draw.rect(screen, (200, 200, 180), save_button)
+        save_text = font_button.render("Save Layout", True, FONT_COLOR)
+        screen.blit(save_text, save_text.get_rect(center=save_button.center))
+
+        pygame.draw.rect(screen, (180, 200, 200), load_button)
+        load_text = font_button.render("Load Layout", True, FONT_COLOR)
+        screen.blit(load_text, load_text.get_rect(center=load_button.center))
+
         debug_y_offset = dropdown_rect.bottom + 40
         mouse_pos_text = f"Mouse Position: {mouse_pos}"
         screen.blit(font_small.render(mouse_pos_text, True, FONT_COLOR), (bp_rect.left, debug_y_offset)); debug_y_offset += 25
@@ -304,12 +397,10 @@ def game_loop():
         else:
             screen.blit(font_small.render("  None", True, FONT_COLOR), (bp_rect.left + 15, debug_y_offset)); debug_y_offset += 25
             
-        # --- MODIFIED: Draw stars last so they are on top of everything ---
         if hovered_item_to_draw_stars and not selected_item:
             item, pos = hovered_item_to_draw_stars
             item.draw_stars(screen, pos)
 
-        # Dropdown options need to be drawn after stars to be on top of them
         if dropdown_open:
             for i, name in enumerate(solver_names):
                 option_rect = pygame.Rect(dropdown_rect.left, dropdown_rect.bottom + i * 30, dropdown_rect.width, 30)
