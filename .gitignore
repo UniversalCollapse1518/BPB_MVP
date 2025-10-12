@@ -18,3 +18,7 @@ dist/
 .vscode/
 *.swp
 *.swo
+
+# test files
+layout/
+test.json
