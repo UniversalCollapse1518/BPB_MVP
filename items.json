@@ -177,7 +177,7 @@
       ],
       "STAR_B_1": [
         {
-          "effect": "ADD_SCORE_TO_TARGET",
+          "effect": "ADD_TO_NEUTRAL_POOL",
           "value": 15,
           "condition_logic": "AND",
           "condition": {

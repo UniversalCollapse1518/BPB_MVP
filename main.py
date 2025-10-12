@@ -12,16 +12,14 @@ from datetime import datetime
 
 from definitions import GridType, Rarity, ItemClass, Element, ItemType
 from engine import Item, CalculationEngine
-# Make sure the solvers can be found
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 from solvers.base_solver import BaseSolver
 
-# --- Setup for tkinter file dialogs ---
 root = tk.Tk()
 root.withdraw()
 
-# Layout and new UI constants
-SCREEN_WIDTH = 1366
+# --- MODIFIED: Final adjusted panel widths ---
+SCREEN_WIDTH = 1600
 SCREEN_HEIGHT = 768
 GRID_SIZE = 40
 BACKPACK_COLS, BACKPACK_ROWS = 9, 7
@@ -30,9 +28,11 @@ PANEL_START_X = BACKPACK_X + (BACKPACK_COLS * GRID_SIZE) + 50
 PANEL_Y = 50
 PANEL_HEIGHT = 630
 SHOP_WIDTH = 300
-INFO_PANEL_WIDTH = 550
+INFO_PANEL_WIDTH = 420  # Reduced width
+NEUTRAL_PANEL_WIDTH = 380 # Increased width
 SHOP_X = PANEL_START_X
 INFO_PANEL_X = SHOP_X + SHOP_WIDTH + 20
+NEUTRAL_PANEL_X = INFO_PANEL_X + INFO_PANEL_WIDTH + 20
 
 BG_COLOR = (255, 255, 255)
 FONT_COLOR = (10, 10, 10)
@@ -44,92 +44,83 @@ STAR_SHAPE_COLORS = { GridType.STAR_A: (255, 215, 0), GridType.STAR_B: (50, 205,
 def save_layout(placed_items: Dict):
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     default_filename = f"layout_{timestamp}.json"
-    filepath = filedialog.asksaveasfilename(
-        initialfile=default_filename,
-        defaultextension=".json",
-        filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
-        title="Save Backpack Layout"
-    )
-    if not filepath:
-        return
-
+    filepath = filedialog.asksaveasfilename(initialfile=default_filename, defaultextension=".json", filetypes=[("JSON files", "*.json"), ("All files", "*.*")], title="Save Backpack Layout")
+    if not filepath: return
     layout_data = []
     for item in placed_items.values():
-        layout_data.append({
-            "name": item.name,
-            "gx": item.gx,
-            "gy": item.gy,
-            "shape_matrix": [[c.value for c in r] for r in item.shape_matrix]
-        })
-    
-    with open(filepath, 'w') as f:
-        json.dump(layout_data, f, indent=2)
+        layout_data.append({"name": item.name, "gx": item.gx, "gy": item.gy, "shape_matrix": [[c.value for c in r] for r in item.shape_matrix]})
+    with open(filepath, 'w') as f: json.dump(layout_data, f, indent=2)
     print(f"Layout saved to {filepath}")
 
 def load_layout(full_item_data: Dict) -> Dict:
-    filepath = filedialog.askopenfilename(
-        filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
-        title="Load Backpack Layout"
-    )
-    if not filepath:
-        return {}
-
+    filepath = filedialog.askopenfilename(filetypes=[("JSON files", "*.json"), ("All files", "*.*")], title="Load Backpack Layout")
+    if not filepath: return {}
     new_placed_items = {}
     try:
-        with open(filepath, 'r') as f:
-            layout_data = json.load(f)
-
+        with open(filepath, 'r') as f: layout_data = json.load(f)
         for item_info in layout_data:
             item_name = item_info["name"]
             base_item_data = next((data for data in full_item_data.values() if data['name'] == item_name), None)
-            
             if base_item_data:
-                item = Item(0, 0, item_name, Rarity[base_item_data['rarity']],
-                            ItemClass[base_item_data['item_class']], 
-                            [Element[e] for e in base_item_data.get('elements', [])],
-                            [ItemType[t] for t in base_item_data.get('types', [])],
-                            [[GridType(c) for c in r] for r in item_info['shape_matrix']],
-                            base_item_data.get('base_score', 0), 
-                            base_item_data.get('star_effects', {}),
-                            base_item_data.get('has_cooldown', False), 
-                            base_item_data.get('is_start_of_battle', False),
-                            base_item_data.get('passive_effects', []))
-                
-                item.gx = item_info["gx"]
-                item.gy = item_info["gy"]
+                item = Item(0, 0, item_name, Rarity[base_item_data['rarity']], ItemClass[base_item_data['item_class']], [Element[e] for e in base_item_data.get('elements', [])], [ItemType[t] for t in base_item_data.get('types', [])], [[GridType(c) for c in r] for r in item_info['shape_matrix']], base_item_data.get('base_score', 0), base_item_data.get('star_effects', {}), base_item_data.get('has_cooldown', False), base_item_data.get('is_start_of_battle', False), base_item_data.get('passive_effects', []))
+                item.gx, item.gy = item_info["gx"], item_info["gy"]
                 key = (item.gx + item.get_body_offset()[1], item.gy + item.get_body_offset()[0])
                 new_placed_items[key] = item
     except Exception as e:
         print(f"Error loading layout: {e}")
         return {}
-    
     print(f"Layout loaded from {filepath}")
     return new_placed_items
-
 
 def load_items_from_file(filepath: str) -> List[Item]:
     items = []
     try:
-        with open(filepath, 'r') as f: data = json.load(f)
-        y_offset = 0
-        for item_data in data.values():
-            item = Item(SHOP_X+10, PANEL_Y+10+y_offset, item_data['name'], Rarity[item_data['rarity']],
+        with open(filepath, 'r') as f:
+            data = json.load(f)
+
+        x_margin, y_margin = 10, 10
+        current_x = SHOP_X + x_margin
+        current_y = PANEL_Y + y_margin
+        max_row_height = 0
+
+        sorted_item_data = sorted(data.values(), key=lambda x: x['name'])
+
+        for item_data in sorted_item_data:
+            item = Item(0, 0, item_data['name'], Rarity[item_data['rarity']],
                         ItemClass[item_data['item_class']], [Element[e] for e in item_data.get('elements', [])],
                         [ItemType[t] for t in item_data.get('types', [])], [[GridType(c) for c in r] for r in item_data['shape_matrix']],
                         item_data.get('base_score', 0), item_data.get('star_effects', {}),
                         item_data.get('has_cooldown', False), item_data.get('is_start_of_battle', False),
                         item_data.get('passive_effects', []))
+            
+            body_bounds = item.get_body_bounds()
+            if not body_bounds: continue
+
+            min_r, min_c, max_r, max_c = body_bounds
+            body_width_px = (max_c - min_c + 1) * GRID_SIZE
+            body_height_px = (max_r - min_r + 1) * GRID_SIZE
+
+            if current_x + body_width_px > SHOP_X + SHOP_WIDTH - x_margin:
+                current_y += max_row_height + y_margin
+                current_x = SHOP_X + x_margin
+                max_row_height = 0
+            
+            item.rect.topleft = (current_x - (min_c * GRID_SIZE), current_y - (min_r * GRID_SIZE))
+            item.base_y = item.rect.y
+
             items.append(item)
-            y_offset += item.rect.height + 10
-    except Exception as e: print(f"Error loading items: {e}")
+            
+            current_x += body_width_px + x_margin
+            max_row_height = max(max_row_height, body_height_px)
+
+    except Exception as e:
+        print(f"Error loading items: {e}")
     return items
 
 def discover_solvers() -> Dict[str, Type[BaseSolver]]:
     solvers = {}
     solver_dir = 'solvers'
-    def format_name(name):
-        return name.replace('Solver', '')
-
+    def format_name(name): return name.replace('Solver', '')
     for filename in os.listdir(solver_dir):
         if filename.endswith('.py') and filename != 'base_solver.py':
             module_name = f"{solver_dir}.{filename[:-3]}"
@@ -138,8 +129,7 @@ def discover_solvers() -> Dict[str, Type[BaseSolver]]:
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)
                 for name, obj in inspect.getmembers(module, inspect.isclass):
-                    if issubclass(obj, BaseSolver) and obj is not BaseSolver:
-                        solvers[format_name(name)] = obj
+                    if issubclass(obj, BaseSolver) and obj is not BaseSolver: solvers[format_name(name)] = obj
     return solvers
 
 def is_placement_valid(item: Item, gx: int, gy: int, items_dict: Dict[Tuple[int, int], Item]) -> bool:
@@ -148,8 +138,7 @@ def is_placement_valid(item: Item, gx: int, gy: int, items_dict: Dict[Tuple[int,
         px, py = p_item.gx, p_item.gy
         for r, row in enumerate(p_item.shape_matrix):
             for c, cell in enumerate(row):
-                if cell == GridType.OCCUPIED:
-                    occupied_cells.add((px + c, py + r))
+                if cell == GridType.OCCUPIED: occupied_cells.add((px + c, py + r))
     for r, row in enumerate(item.shape_matrix):
         for c, cell in enumerate(row):
             if cell == GridType.OCCUPIED:
@@ -193,13 +182,26 @@ def game_loop():
 
     shop_area_rect = pygame.Rect(SHOP_X, PANEL_Y, SHOP_WIDTH, PANEL_HEIGHT)
     info_panel_rect = pygame.Rect(INFO_PANEL_X, PANEL_Y, INFO_PANEL_WIDTH, PANEL_HEIGHT)
-    total_score_rect = pygame.Rect(INFO_PANEL_X, info_panel_rect.bottom + 5, INFO_PANEL_WIDTH, 45)
+    neutral_panel_rect = pygame.Rect(NEUTRAL_PANEL_X, PANEL_Y, NEUTRAL_PANEL_WIDTH, PANEL_HEIGHT)
+    
+    total_score_rect = pygame.Rect(PANEL_START_X, info_panel_rect.bottom + 5, SCREEN_WIDTH - PANEL_START_X - 30, 45)
+    calc_button = pygame.Rect(PANEL_START_X, total_score_rect.bottom + 5, 150, 40)
     calc_text_surf = font_medium.render("Calculate", True, FONT_COLOR)
-    calc_button_width = calc_text_surf.get_width() + 40
-    calc_button = pygame.Rect(INFO_PANEL_X, total_score_rect.bottom + 5, calc_button_width, 40)
 
-    shop_scroll_y, info_scroll_y = 0, 0
-    total_shop_height = sum(item.rect.height + 10 for item in items_in_shop) if items_in_shop else 0
+    shop_scroll_y, info_scroll_y, neutral_scroll_y = 0, 0, 0
+    
+    total_shop_height = 0
+    if items_in_shop:
+        max_y = 0
+        for item in items_in_shop:
+            if item.rect:
+                body_bounds = item.get_body_bounds()
+                if body_bounds:
+                    min_r, _, max_r, _ = body_bounds
+                    item_bottom = item.rect.y + (max_r * GRID_SIZE) + GRID_SIZE
+                    max_y = max(max_y, item_bottom)
+        total_shop_height = max_y - (PANEL_Y + 10)
+
     total_score = 0
     info_content_height = 0
 
@@ -209,14 +211,18 @@ def game_loop():
         for event in pygame.event.get():
             if event.type == pygame.QUIT: running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 4:
+                if event.button == 4: # Scroll Up
                     if shop_area_rect.collidepoint(mouse_pos): shop_scroll_y = max(0, shop_scroll_y - 20)
                     if info_panel_rect.collidepoint(mouse_pos): info_scroll_y = max(0, info_scroll_y - 20)
-                elif event.button == 5:
+                    if neutral_panel_rect.collidepoint(mouse_pos): neutral_scroll_y = max(0, neutral_scroll_y - 20)
+                elif event.button == 5: # Scroll Down
                     if shop_area_rect.collidepoint(mouse_pos):
                         shop_scroll_y = min(max(0, total_shop_height - shop_area_rect.height), shop_scroll_y + 20)
                     if info_panel_rect.collidepoint(mouse_pos):
                         info_scroll_y = min(max(0, info_content_height - info_panel_rect.height), info_scroll_y + 20)
+                    if neutral_panel_rect.collidepoint(mouse_pos):
+                        neutral_h = 55 + len(engine.neutral_pool_modifiers) * 25
+                        neutral_scroll_y = min(max(0, neutral_h - neutral_panel_rect.height), neutral_scroll_y + 20)
                 elif event.button == 3 and selected_item and selected_item.dragging:
                     rx, ry = mouse_pos[0]-selected_item.rect.x, mouse_pos[1]-selected_item.rect.y
                     pc, pr = rx // GRID_SIZE, ry // GRID_SIZE; ogh = selected_item.grid_height
@@ -231,7 +237,7 @@ def game_loop():
                     elif load_button.collidepoint(mouse_pos):
                         placed_items = load_layout(full_item_definitions)
                         engine.run(placed_items, BACKPACK_COLS, BACKPACK_ROWS)
-                        total_score = sum(item.final_score for item in placed_items.values())
+                        total_score = sum(item.final_score for item in placed_items.values()) + engine.neutral_pool_total
                         dropdown_open = False
                     elif dropdown_rect.collidepoint(mouse_pos):
                         dropdown_open = not dropdown_open
@@ -255,7 +261,7 @@ def game_loop():
                             best_layout, best_score = solver_instance.solve()
                             placed_items = best_layout
                             engine.run(placed_items, BACKPACK_COLS, BACKPACK_ROWS)
-                            total_score = sum(item.final_score for item in placed_items.values())
+                            total_score = sum(item.final_score for item in placed_items.values()) + engine.neutral_pool_total
                         dropdown_open = False
                     else:
                         dropdown_open = False
@@ -280,7 +286,7 @@ def game_loop():
                                     break
                         if calc_button.collidepoint(mouse_pos):
                             engine.run(placed_items, BACKPACK_COLS, BACKPACK_ROWS)
-                            total_score = sum(item.final_score for item in placed_items.values())
+                            total_score = sum(item.final_score for item in placed_items.values()) + engine.neutral_pool_total
 
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1 and selected_item:
@@ -303,6 +309,7 @@ def game_loop():
         pygame.draw.rect(screen, (230,230,230), bp_rect); pygame.draw.rect(screen, (240,240,240), shop_area_rect, 2);
         pygame.draw.rect(screen, (210, 210, 210), total_score_rect); pygame.draw.rect(screen, (180, 180, 180), total_score_rect, 2)
         pygame.draw.rect(screen, (220,220,220), info_panel_rect); pygame.draw.rect(screen, (180,180,180), info_panel_rect, 2)
+        pygame.draw.rect(screen, (225,225,215), neutral_panel_rect); pygame.draw.rect(screen, (180,180,170), neutral_panel_rect, 2)
 
         for x in range(bp_rect.left, bp_rect.right + 1, GRID_SIZE): pygame.draw.line(screen, GRID_LINE_COLOR, (x, bp_rect.top), (x, bp_rect.bottom))
         for y in range(bp_rect.top, bp_rect.bottom + 1, GRID_SIZE): pygame.draw.line(screen, GRID_LINE_COLOR, (bp_rect.left, y), (bp_rect.right, y))
@@ -333,6 +340,15 @@ def game_loop():
             screen.blit(font_medium.render(f"Final Score: {item.final_score:.1f}", True, FONT_COLOR), (info_panel_rect.x+25, info_panel_rect.y+y_off-info_scroll_y)); y_off += 30
             y_off += 15
         screen.set_clip(None)
+        
+        screen.set_clip(neutral_panel_rect)
+        screen.blit(font_large.render("Neutral Pool", True, FONT_COLOR), (neutral_panel_rect.x + 10, neutral_panel_rect.y + 10 - neutral_scroll_y))
+        screen.blit(font_medium.render(f"Total: {engine.neutral_pool_total:.1f}", True, FONT_COLOR), (neutral_panel_rect.x + 15, neutral_panel_rect.y + 55 - neutral_scroll_y))
+        y_off_neutral = 90
+        for mod in engine.neutral_pool_modifiers:
+            screen.blit(font_small.render(mod, True, (100, 20, 20)), (neutral_panel_rect.x + 25, neutral_panel_rect.y + y_off_neutral - neutral_scroll_y)); y_off_neutral += 25
+        screen.set_clip(None)
+
 
         total_score_surf = font_large.render(f"Total Score: {total_score:.1f}", True, FONT_COLOR)
         screen.blit(total_score_surf, total_score_surf.get_rect(center=total_score_rect.center))
@@ -406,7 +422,7 @@ def game_loop():
                 option_rect = pygame.Rect(dropdown_rect.left, dropdown_rect.bottom + i * 30, dropdown_rect.width, 30)
                 pygame.draw.rect(screen, (240, 240, 240), option_rect); pygame.draw.rect(screen, (180, 180, 180), option_rect, 1)
                 option_text = font_button.render(name, True, FONT_COLOR)
-                screen.blit(option_text, (option_rect.x + 10, option_rect.centery - option_text.get_height() // 2))
+                screen.blit(option_text, (option_rect.x + 10, option_text.get_height() // 2 + option_rect.y))
 
         pygame.display.flip()
         clock.tick(60)

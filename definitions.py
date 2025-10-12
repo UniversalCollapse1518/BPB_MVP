@@ -39,7 +39,8 @@ class ItemType(Enum):
 EFFECT_TYPES = [
     "ADD_SCORE_TO_SELF", "ADD_SCORE_TO_TARGET",
     "MULTIPLY_SCORE_OF_SELF", "MULTIPLY_SCORE_OF_TARGET",
-    "ADD_ELEMENT_TO_TARGET"
+    "ADD_ELEMENT_TO_TARGET",
+    "ADD_TO_NEUTRAL_POOL" # --- NEW ---
 ]
 
 CONDITION_TYPES = [
@@ -51,4 +52,3 @@ CONDITION_TYPES = [
     "requires_empty",
     "must_be_different"
 ]
-

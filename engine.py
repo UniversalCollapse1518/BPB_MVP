@@ -119,63 +119,47 @@ class Item(pygame.sprite.Sprite):
 
 
 class CalculationEngine:
-    # ... (check_condition and get_effect_value are unchanged) ...
+    def __init__(self):
+        # --- NEW: Attributes for the neutral score pool ---
+        self.neutral_pool_modifiers = []
+        self.neutral_pool_total = 0.0
+
     def _check_condition(self, condition_data: dict, source_item: Item, target_item: Optional[Item], condition_logic: str = "AND") -> bool:
-        if not condition_data:
-            return True
-
+        # ... (function is unchanged) ...
+        if not condition_data: return True
         check_results = []
-
         if "requires_empty" in condition_data:
-            if condition_data["requires_empty"]:
-                check_results.append(target_item is None)
-
+            if condition_data["requires_empty"]: check_results.append(target_item is None)
         if target_item is not None:
             if "requires_element" in condition_data:
                 reqs = condition_data["requires_element"]
                 if not isinstance(reqs, list): reqs = [reqs]
                 target_elems = set(target_item.elements + target_item.temporary_elements)
                 check_results.append(any(Element[req.upper()] in target_elems for req in reqs))
-
             if "requires_type" in condition_data:
                 reqs = condition_data["requires_type"]
                 if not isinstance(reqs, list): reqs = [reqs]
                 check_results.append(any(ItemType[req.upper()] in target_item.types for req in reqs))
-            
             if "requires_name" in condition_data:
                 reqs = condition_data["requires_name"]
                 if not isinstance(reqs, list): reqs = [reqs]
                 check_results.append(target_item.name in reqs)
-
             if "must_be_different" in condition_data:
-                if condition_data["must_be_different"]:
-                    check_results.append(source_item.name != target_item.name)
-
+                if condition_data["must_be_different"]: check_results.append(source_item.name != target_item.name)
             if "requires_cooldown" in condition_data:
-                if condition_data["requires_cooldown"]:
-                    check_results.append(getattr(target_item, 'has_cooldown', False))
-
+                if condition_data["requires_cooldown"]: check_results.append(getattr(target_item, 'has_cooldown', False))
             if "requires_start_of_battle" in condition_data:
-                if condition_data["requires_start_of_battle"]:
-                    check_results.append(getattr(target_item, 'is_start_of_battle', False))
-        
+                if condition_data["requires_start_of_battle"]: check_results.append(getattr(target_item, 'is_start_of_battle', False))
         else:
             for key in condition_data:
-                if key != "requires_empty":
-                    check_results.append(False)
-
-        if not check_results:
-            return True
-
-        if condition_logic == "OR":
-            return any(check_results)
-        else:
-            return all(check_results)
+                if key != "requires_empty": check_results.append(False)
+        if not check_results: return True
+        return any(check_results) if condition_logic == "OR" else all(check_results)
 
     def _get_effect_value(self, effect_data: dict, source_item: Item) -> Any:
+        # ... (function is unchanged) ...
         value_data = effect_data.get("value", 0)
         if not isinstance(value_data, dict): return value_data
-
         final_value = value_data.get("base", 0.0)
         if "dynamic_bonus" in value_data:
             bonus_data = value_data["dynamic_bonus"]
@@ -183,8 +167,12 @@ class CalculationEngine:
             num_activated = source_item.activated_stars.get(per_star_type, 0)
             final_value += num_activated * bonus_data.get("add", 0)
         return final_value
+        
     def run(self, placed_items: Dict[Any, Item], backpack_cols: int, backpack_rows: int):
-        # ... (initial setup is unchanged) ...
+        # --- NEW: Reset neutral pool on each run ---
+        self.neutral_pool_modifiers.clear()
+        self.neutral_pool_total = 0.0
+
         occupancy_grid: List[List[Optional[Item]]] = [[None for _ in range(backpack_cols)] for _ in range(backpack_rows)]
         for item in placed_items.values():
             item.final_score = item.base_score
@@ -197,9 +185,8 @@ class CalculationEngine:
                 for c, cell in enumerate(row):
                     if cell == GridType.OCCUPIED and 0 <= gy+r < backpack_rows and 0 <= gx+c < backpack_cols:
                         occupancy_grid[gy+r][gx+c] = item
-
+        # ... (element adding and star activation loops are unchanged) ...
         for source_item in placed_items.values():
-            # ... (element adding loop is unchanged) ...
             gx, gy = source_item.gx, source_item.gy
             for r, row in enumerate(source_item.shape_matrix):
                 for c, cell_type in enumerate(row):
@@ -207,43 +194,33 @@ class CalculationEngine:
                         base_star_name = cell_type.name
                         for star_key in source_item.star_effects:
                             if star_key.startswith(base_star_name):
-                                effects = source_item.star_effects.get(star_key, [])
+                                effects, logic = (source_item.star_effects.get(star_key, []), "AND")
                                 if not isinstance(effects, list): effects = [effects]
-                                
                                 abs_x, abs_y = gx + c, gy + r
                                 target_item = occupancy_grid[abs_y][abs_x] if 0 <= abs_y < backpack_rows and 0 <= abs_x < backpack_cols else None
-                                
                                 for effect_data in effects:
                                     logic = effect_data.get("condition_logic", "AND")
                                     if effect_data.get("effect") == "ADD_ELEMENT_TO_TARGET" and self._check_condition(effect_data.get("condition", {}), source_item, target_item, logic):
                                         if target_item:
                                             try:
                                                 element_to_add = Element[effect_data["value"].upper()]
-                                                if element_to_add not in target_item.temporary_elements:
-                                                    target_item.temporary_elements.append(element_to_add)
-                                            except (KeyError, AttributeError):
-                                                print(f"Warning: Invalid element '{effect_data['value']}' for ADD_ELEMENT_TO_TARGET in {source_item.name}")
+                                                if element_to_add not in target_item.temporary_elements: target_item.temporary_elements.append(element_to_add)
+                                            except (KeyError, AttributeError): print(f"Warning: Invalid element '{effect_data['value']}' for ADD_ELEMENT_TO_TARGET in {source_item.name}")
                                         break
-        
         for source_item in placed_items.values():
             gx, gy = source_item.gx, source_item.gy
             triggered_by = {GridType.STAR_A: set(), GridType.STAR_B: set(), GridType.STAR_C: set()}
             for r, row in enumerate(source_item.shape_matrix):
                 for c, cell_type in enumerate(row):
                     if cell_type in triggered_by:
-                        # --- MODIFIED: Add boundary check for star activation ---
                         abs_x, abs_y = gx + c, gy + r
-                        if not(0 <= abs_x < backpack_cols and 0 <= abs_y < backpack_rows):
-                            continue # Skip stars outside the backpack
-
+                        if not(0 <= abs_x < backpack_cols and 0 <= abs_y < backpack_rows): continue
                         base_star_name = cell_type.name
                         for star_key in source_item.star_effects:
                             if star_key.startswith(base_star_name):
                                 effects = source_item.star_effects.get(star_key, [])
                                 if not isinstance(effects, list): effects = [effects]
-                                
                                 target_item = occupancy_grid[abs_y][abs_x]
-                                
                                 for effect_data in effects:
                                     logic = effect_data.get("condition_logic", "AND")
                                     if self._check_condition(effect_data.get("condition", {}), source_item, target_item, logic):
@@ -270,70 +247,67 @@ class CalculationEngine:
             for r, row in enumerate(source_item.shape_matrix):
                 for c, cell_type in enumerate(row):
                     if cell_type in triggered_targets:
-                        # --- MODIFIED: Add boundary check for score effects ---
                         abs_x, abs_y = gx + c, gy + r
-                        if not(0 <= abs_x < backpack_cols and 0 <= abs_y < backpack_rows):
-                            continue # Skip stars outside the backpack
-
+                        if not(0 <= abs_x < backpack_cols and 0 <= abs_y < backpack_rows): continue
                         target_item = occupancy_grid[abs_y][abs_x]
-                        
                         is_duplicate = False
                         if target_item is not None:
                             if target_item in triggered_targets[cell_type]: is_duplicate = True
-                        
                         if is_duplicate: continue
-                        
                         base_star_name = cell_type.name
                         effect_applied_for_this_cell = False
                         for star_key in source_item.star_effects:
                             if star_key.startswith(base_star_name):
                                 effects = source_item.star_effects[star_key]
                                 if not isinstance(effects, list): effects = [effects]
-
                                 for effect_data in effects:
                                     logic = effect_data.get("condition_logic", "AND")
                                     if self._check_condition(effect_data.get("condition", {}), source_item, target_item, logic):
-                                        if "effect" in effect_data and "SCORE" in effect_data["effect"]:
+                                        if "effect" in effect_data: # All score effects fall in here
                                             value = self._get_effect_value(effect_data, source_item)
                                             reason = f"Star {cell_type.name.split('_')[1]}"
                                             all_effects.append({"source": source_item, "target": target_item, "effect": effect_data["effect"], "value": value, "reason": reason})
-                                        
                                         if target_item is not None:
                                             triggered_targets[cell_type].add(target_item)
-                                            
                                         effect_applied_for_this_cell = True
                                         break
                                 if effect_applied_for_this_cell: break
         
-        # ... (final score calculation loops are unchanged) ...
+        # --- NEW: Loop to process neutral pool effects ---
+        for eff in all_effects:
+            if eff["effect"] == "ADD_TO_NEUTRAL_POOL":
+                try:
+                    numeric_value = float(eff["value"])
+                    reason_text = f"from {eff['source'].name}'s {eff['reason']}"
+                    self.neutral_pool_total += numeric_value
+                    self.neutral_pool_modifiers.append(f"+{numeric_value:.1f} ({reason_text})")
+                except (ValueError, TypeError):
+                    continue
+
         for effect_type in ["ADD_SCORE_TO_SELF", "ADD_SCORE_TO_TARGET"]:
             for eff in all_effects:
                 if eff["effect"] == effect_type:
                     try:
                         numeric_value = float(eff["value"])
-                    except (ValueError, TypeError):
-                        continue 
-
-                    if eff["effect"] == "ADD_SCORE_TO_SELF":
-                        reason_text = eff.get("reason", "self")
-                        eff["source"].final_score += numeric_value
-                        eff["source"].score_modifiers.append(f"+{numeric_value:.1f} ({reason_text})")
-                    elif eff["target"]:
-                        eff["target"].final_score += numeric_value
-                        eff["target"].score_modifiers.append(f"+{numeric_value:.1f} from {eff['source'].name}")
+                        if eff["effect"] == "ADD_SCORE_TO_SELF":
+                            reason_text = eff.get("reason", "self")
+                            eff["source"].final_score += numeric_value
+                            eff["source"].score_modifiers.append(f"+{numeric_value:.1f} ({reason_text})")
+                        elif eff["target"]:
+                            eff["target"].final_score += numeric_value
+                            eff["target"].score_modifiers.append(f"+{numeric_value:.1f} from {eff['source'].name}")
+                    except (ValueError, TypeError): continue
         
         for effect_type in ["MULTIPLY_SCORE_OF_SELF", "MULTIPLY_SCORE_OF_TARGET"]:
             for eff in all_effects:
                 if eff["effect"] == effect_type:
                     try:
                         numeric_value = float(eff["value"])
-                    except (ValueError, TypeError):
-                        continue
-
-                    if eff["effect"] == "MULTIPLY_SCORE_OF_SELF":
-                        reason_text = eff.get("reason", "self")
-                        eff["source"].final_score *= numeric_value
-                        eff["source"].score_modifiers.append(f"x{numeric_value:.2f} ({reason_text})")
-                    elif eff["target"]:
-                        eff["target"].final_score *= numeric_value
-                        eff["target"].score_modifiers.append(f"x{numeric_value:.2f} from {eff['source'].name}")
+                        if eff["effect"] == "MULTIPLY_SCORE_OF_SELF":
+                            reason_text = eff.get("reason", "self")
+                            eff["source"].final_score *= numeric_value
+                            eff["source"].score_modifiers.append(f"x{numeric_value:.2f} ({reason_text})")
+                        elif eff["target"]:
+                            eff["target"].final_score *= numeric_value
+                            eff["target"].score_modifiers.append(f"x{numeric_value:.2f} from {eff['source'].name}")
+                    except (ValueError, TypeError): continue
