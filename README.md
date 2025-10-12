@@ -1,7 +1,9 @@
 # BPB_MVP: Backpack Battles Simulator & Editor
 
 This project is a tool designed to simulate and analyze item builds for the game Backpack Battles. It consists of two main parts: a simulator for manually placing items and a GUI editor for creating and managing item data.
+
 refer to a Bilibili intro video by me, in Chinese.
+
 【背包乱斗摆盘求解小玩具-功能介绍与画面展示】 https://www.bilibili.com/video/BV14v4czhEwQ/?share_source=copy_web&vd_source=6ca11da6fac510effe333bdc3286e565
 
 ## Features
