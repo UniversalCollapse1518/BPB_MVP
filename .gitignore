@@ -1,24 +1,26 @@
-# Python
+# Python artifacts
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .Python
+pip-selfcheck.json
+
+# Virtual Environments
 env/
 venv/
-pip-selfcheck.json
 
 # Build artifacts
 build/
 dist/
 *.egg-info/
 
-# IDE files
+# IDE configuration
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# test files
+# Custom test files and layouts
 layout/
 test.json

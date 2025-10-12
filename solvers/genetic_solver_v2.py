@@ -1,18 +1,19 @@
 import random
+import math
 from typing import Tuple, Dict, List, Optional
 from collections import Counter
 
 from solvers.base_solver import BaseSolver
 from engine import Item, GridType
 
-class GeneticSolver(BaseSolver):
+class GeneticSolverV2(BaseSolver):
     """
-    Algorithm D: A Genetic Algorithm to find an optimal backpack layout.
-    Features an advanced "Anchor and Optimize" crossover strategy with
-    "Star-Seeker" placement for intelligent synergy creation.
+    Algorithm E: A high-speed Genetic Algorithm.
+    Uses a fast "Parent Swap" crossover and a "Randomized Spiral Scan"
+    for centrally-biased, non-deterministic placement.
     """
     def __init__(self, items: List[Item], backpack_cols: int, backpack_rows: int,
-                 population_size: int = 50, generations: int = 100, mutation_rate: float = 0.18,
+                 population_size: int = 80, generations: int = 150, mutation_rate: float = 0.15,
                  tournament_size: int = 7, elitism_count: int = 5, initial_layout: Optional[Dict] = None):
         super().__init__(items, backpack_cols, backpack_rows)
         self.population_size = population_size
@@ -22,6 +23,20 @@ class GeneticSolver(BaseSolver):
         self.elitism_count = elitism_count
         self.item_manifest = Counter(item.name for item in self.items_to_place)
         self.initial_layout = initial_layout
+        # Pre-calculate the spiral search path once for efficiency
+        self.search_path = self._get_center_out_path()
+
+    def _get_center_out_path(self) -> List[Tuple[int, int]]:
+        """Creates a list of all grid coordinates, sorted by distance from the center."""
+        center_x = (self.backpack_cols - 1) / 2.0
+        center_y = (self.backpack_rows - 1) / 2.0
+        
+        all_coords = [(x, y) for x in range(self.backpack_cols) for y in range(self.backpack_rows)]
+        
+        # Sort coordinates by their Euclidean distance to the center
+        all_coords.sort(key=lambda coord: math.dist((coord[0], coord[1]), (center_x, center_y)))
+        
+        return all_coords
 
     def _create_random_individual(self) -> Dict:
         layout = {}
@@ -39,133 +54,56 @@ class GeneticSolver(BaseSolver):
                     break
         return layout
 
-    def _tournament_selection(self, population: List[Tuple[Dict, float, List]]) -> Tuple[Dict, List]:
+    def _tournament_selection(self, population: List[Tuple[Dict, float, List]]) -> Dict:
         tournament = random.sample(population, self.tournament_size)
         best = max(tournament, key=lambda ind: ind[1])
-        return best[0], best[2]
+        return best[0]
 
-    def _crossover(self, parent1: Dict, parent2: Dict, parent1_interaction_map: List[Tuple[str, str]]) -> Dict:
-        if not parent1 or not parent1.values(): return {k: v.clone() for k, v in parent2.items()}
+    def _crossover(self, parent1: Dict, parent2: Dict) -> Dict:
+        if not parent1: return {k: v.clone() for k, v in parent2.items()}
+        if not parent2: return {k: v.clone() for k, v in parent1.items()}
+
+        child_layout = {key: item.clone() for key, item in parent1.items()}
         
-        child_layout = {}
+        parent2_items = list(parent2.values())
+        random.shuffle(parent2_items)
+        subset_size = max(1, len(self.items_to_place) // 4)
+        invaders = parent2_items[:subset_size]
         
-        # --- Phase 1: Anchor the Synergy Core ---
-        mvp_item = max(parent1.values(), key=lambda item: item.final_score)
-        synergy_cluster_names = {mvp_item.name}
-        for source, target in parent1_interaction_map:
-            if source == mvp_item.name: synergy_cluster_names.add(target)
-            if target == mvp_item.name: synergy_cluster_names.add(source)
+        invader_counts = Counter(item.name for item in invaders)
+        
+        keys_to_remove = []
+        for key, item in child_layout.items():
+            if invader_counts.get(item.name, 0) > 0:
+                keys_to_remove.append(key)
+                invader_counts[item.name] -= 1
+        
+        for key in keys_to_remove:
+            del child_layout[key]
 
-        core_items = [item.clone() for item in parent1.values() if item.name in synergy_cluster_names]
-
-        if core_items:
-            min_gx = min(it.gx for it in core_items)
-            min_gy = min(it.gy for it in core_items)
-            max_gx = max(it.gx + it.grid_width for it in core_items)
-            max_gy = max(it.gy + it.grid_height for it in core_items)
-            core_center_gx = (min_gx + max_gx) / 2.0
-            core_center_gy = (min_gy + max_gy) / 2.0
-            
-            backpack_center_gx = self.backpack_cols / 2.0
-            backpack_center_gy = self.backpack_rows / 2.0
-            
-            dx = round(backpack_center_gx - core_center_gx)
-            dy = round(backpack_center_gy - core_center_gy)
-            
-            is_shift_valid = True
-            temp_shifted_core_layout = {}
-            for item in core_items:
-                shifted_gx, shifted_gy = item.gx + dx, item.gy + dy
-                if not self._is_placement_valid(item, shifted_gx, shifted_gy, temp_shifted_core_layout):
-                    is_shift_valid = False
-                    break
-                item_copy = item.clone()
-                item_copy.gx, item_copy.gy = shifted_gx, shifted_gy
-                offset_c, offset_r = item_copy.get_body_offset()
-                key = (item_copy.gx + offset_c, item_copy.gy + offset_r)
-                temp_shifted_core_layout[key] = item_copy
-            
-            child_layout = temp_shifted_core_layout if is_shift_valid else { (it.gx + it.get_body_offset()[0], it.gy + it.get_body_offset()[1]): it for it in core_items }
-
-        # --- Phase 2: "Star-Seeker" Placement for Remaining Items ---
-        child_manifest = Counter(item.name for item in child_layout.values())
-        missing_manifest = self.item_manifest - child_manifest
-        items_to_add = []
-        parent2_items_by_name = {item.name: item for item in parent2.values()}
-        for name, count in missing_manifest.items():
-            if name in parent2_items_by_name:
-                for _ in range(count):
-                    items_to_add.append(parent2_items_by_name[name].clone())
-        random.shuffle(items_to_add)
-
-        for item in items_to_add:
-            best_placement = None
-            best_score = -1
-
-            # 1. Identify "Synergy Hotspots"
-            hotspots = set()
-            core_occupancy = set()
-            for core_item in child_layout.values():
-                for r, row in enumerate(core_item.shape_matrix):
-                    for c, cell in enumerate(row):
-                        ax, ay = core_item.gx + c, core_item.gy + r
-                        if cell == GridType.OCCUPIED:
-                            core_occupancy.add((ax, ay))
-                        elif cell.name.startswith("STAR"):
-                            hotspots.add((ax, ay))
-            
-            # Remove hotspots that are already occupied
-            hotspots -= core_occupancy
-
-            # 2. Attempt "Best-Fit" on Hotspots
+        for item in invaders:
+            placed = False
             item_copy = item.clone()
-            for _ in range(4):
+            for _ in range(4): # Try all rotations
                 item_copy.rotate()
                 occupied_cells = [(c, r) for r, row in enumerate(item_copy.shape_matrix) for c, cell in enumerate(row) if cell == GridType.OCCUPIED]
                 if not occupied_cells: continue
                 
-                for handle_c, handle_r in occupied_cells:
-                    for spot_x, spot_y in hotspots:
+                # Use the pre-calculated center-out search path
+                for spot_x, spot_y in self.search_path:
+                    # Try to align each part of the item's body with the target spot
+                    for handle_c, handle_r in occupied_cells:
                         gx, gy = spot_x - handle_c, spot_y - handle_r
-                        
                         if self._is_placement_valid(item_copy, gx, gy, child_layout):
-                            score = 0
-                            # Calculate synergy score for this placement
-                            for r_new, row_new in enumerate(item_copy.shape_matrix):
-                                for c_new, cell_new in enumerate(row_new):
-                                    if cell_new.name.startswith("STAR"):
-                                        if (gx + c_new, gy + r_new) in core_occupancy:
-                                            score += 1
-                            
-                            if score > best_score:
-                                best_score = score
-                                best_item_state = item_copy.clone()
-                                best_placement = (gx, gy, best_item_state)
-            
-            # 3. Place Item
-            if best_placement:
-                gx, gy, best_item = best_placement
-                best_item.gx, best_item.gy = gx, gy
-                offset_c, offset_r = best_item.get_body_offset()
-                key = (gx + offset_c, gy + offset_r)
-                child_layout[key] = best_item
-            else:
-                # 4. Fallback: Greedy scan if no hotspot placement worked
-                placed = False
-                for _ in range(4):
-                    item.rotate()
-                    for gy_fall in range(-item.grid_height, self.backpack_rows):
-                        for gx_fall in range(-item.grid_width, self.backpack_cols):
-                            if self._is_placement_valid(item, gx_fall, gy_fall, child_layout):
-                                item.gx, item.gy = gx_fall, gy_fall
-                                offset_c, offset_r = item.get_body_offset()
-                                key = (gx_fall + offset_c, gy_fall + offset_r)
-                                child_layout[key] = item
-                                placed = True
-                                break
-                        if placed: break
+                            item_copy.gx, item_copy.gy = gx, gy
+                            offset_c, offset_r = item_copy.get_body_offset()
+                            key = (gx + offset_c, gy + offset_r)
+                            child_layout[key] = item_copy
+                            placed = True
+                            break
                     if placed: break
-
+                if placed: break
+        
         return child_layout
 
     def _mutate(self, layout: Dict) -> Dict:
@@ -259,10 +197,10 @@ class GeneticSolver(BaseSolver):
                 next_population.append(scored_population[i][0])
             
             while len(next_population) < self.population_size:
-                parent1_layout, p1_map = self._tournament_selection(scored_population)
-                parent2_layout, _ = self._tournament_selection(scored_population)
+                parent1 = self._tournament_selection(scored_population)
+                parent2 = self._tournament_selection(scored_population)
                 
-                child = self._crossover(parent1_layout, parent2_layout, p1_map)
+                child = self._crossover(parent1, parent2)
                 child = self._mutate(child)
                 next_population.append(child)
             

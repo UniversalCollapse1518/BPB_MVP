@@ -64,7 +64,8 @@ def load_layout(full_item_data: Dict) -> Dict:
             if base_item_data:
                 item = Item(0, 0, item_name, Rarity[base_item_data['rarity']], ItemClass[base_item_data['item_class']], [Element[e] for e in base_item_data.get('elements', [])], [ItemType[t] for t in base_item_data.get('types', [])], [[GridType(c) for c in r] for r in item_info['shape_matrix']], base_item_data.get('base_score', 0), base_item_data.get('star_effects', {}), base_item_data.get('has_cooldown', False), base_item_data.get('is_start_of_battle', False), base_item_data.get('passive_effects', []))
                 item.gx, item.gy = item_info["gx"], item_info["gy"]
-                key = (item.gx + item.get_body_offset()[1], item.gy + item.get_body_offset()[0])
+                offset_c, offset_r = item.get_body_offset()
+                key = (item.gx + offset_c, item.gy + offset_r)
                 new_placed_items[key] = item
     except Exception as e:
         print(f"Error loading layout: {e}")
@@ -122,15 +123,17 @@ def discover_solvers() -> Dict[str, Type[BaseSolver]]:
     solver_dir = 'solvers'
     def format_name(name): return name.replace('Solver', '')
     for filename in os.listdir(solver_dir):
-        if filename.endswith('.py') and filename != 'base_solver.py':
+        if filename.endswith('.py') and not filename.startswith('base'):
             module_name = f"{solver_dir}.{filename[:-3]}"
             spec = importlib.util.spec_from_file_location(module_name, os.path.join(solver_dir, filename))
             if spec and spec.loader:
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)
                 for name, obj in inspect.getmembers(module, inspect.isclass):
-                    if issubclass(obj, BaseSolver) and obj is not BaseSolver: solvers[format_name(name)] = obj
-    return solvers
+                    if issubclass(obj, BaseSolver) and obj is not BaseSolver: 
+                        solvers[format_name(name)] = obj
+    # Sort solvers alphabetically for consistent order
+    return dict(sorted(solvers.items()))
 
 def is_placement_valid(item: Item, gx: int, gy: int, items_dict: Dict[Tuple[int, int], Item]) -> bool:
     occupied_cells = set()
@@ -176,7 +179,10 @@ def game_loop():
     run_solver_button = pygame.Rect(dropdown_rect.right + 10, dropdown_y, 130, 40)
     dropdown_open = False
 
-    save_load_y = run_solver_button.bottom + 10
+    # --- FIX: Move Save/Load buttons down to make space for the dropdown menu ---
+    dropdown_options_height = len(solver_names) * 30  # Each option is 30px tall
+    save_load_y = dropdown_rect.bottom + dropdown_options_height + 20 # Add extra padding
+    
     save_button = pygame.Rect(BACKPACK_X, save_load_y, 175, 40)
     load_button = pygame.Rect(save_button.right + 10, save_load_y, 175, 40)
 
@@ -231,7 +237,21 @@ def game_loop():
                     nr = selected_item.body_image.get_rect(x=mouse_pos[0]-npx, y=mouse_pos[1]-npy)
                     selected_item.rect, offset_x, offset_y = nr, nr.x-mouse_pos[0], nr.y-mouse_pos[1]
                 elif event.button == 1:
-                    if save_button.collidepoint(mouse_pos):
+                    clicked_on_dropdown_option = False
+                    if dropdown_open:
+                        for i, name in enumerate(solver_names):
+                            option_rect = pygame.Rect(dropdown_rect.left, dropdown_rect.bottom + i * 30, dropdown_rect.width, 30)
+                            if option_rect.collidepoint(mouse_pos):
+                                selected_solver_name = name
+                                dropdown_open = False
+                                clicked_on_dropdown_option = True
+                                break
+                    
+                    if clicked_on_dropdown_option:
+                        pass # Don't process other clicks if a dropdown option was chosen
+                    elif dropdown_rect.collidepoint(mouse_pos):
+                        dropdown_open = not dropdown_open
+                    elif save_button.collidepoint(mouse_pos):
                         save_layout(placed_items)
                         dropdown_open = False
                     elif load_button.collidepoint(mouse_pos):
@@ -239,17 +259,6 @@ def game_loop():
                         engine.run(placed_items, BACKPACK_COLS, BACKPACK_ROWS)
                         total_score = sum(item.final_score for item in placed_items.values()) + engine.neutral_pool_total
                         dropdown_open = False
-                    elif dropdown_rect.collidepoint(mouse_pos):
-                        dropdown_open = not dropdown_open
-                    elif dropdown_open:
-                        for i, name in enumerate(solver_names):
-                            option_rect = pygame.Rect(dropdown_rect.left, dropdown_rect.bottom + i * 30, dropdown_rect.width, 30)
-                            if option_rect.collidepoint(mouse_pos):
-                                selected_solver_name = name
-                                dropdown_open = False
-                                break
-                        else:
-                           dropdown_open = False
                     elif run_solver_button.collidepoint(mouse_pos) and selected_solver_name in available_solvers:
                         items_in_backpack = list(placed_items.values())
                         if not items_in_backpack:
@@ -264,7 +273,7 @@ def game_loop():
                             total_score = sum(item.final_score for item in placed_items.values()) + engine.neutral_pool_total
                         dropdown_open = False
                     else:
-                        dropdown_open = False
+                        dropdown_open = False # Close dropdown if clicking anywhere else
                         item_to_pick_info = None
                         for key, item in reversed(list(placed_items.items())):
                             item_pos_on_screen = (BACKPACK_X + item.gx * GRID_SIZE, BACKPACK_Y + item.gy * GRID_SIZE)
@@ -405,7 +414,7 @@ def game_loop():
         screen.blit(font_small.render(dragging_item_text, True, FONT_COLOR), (bp_rect.left, debug_y_offset)); debug_y_offset += 25
         screen.blit(font_small.render("Placed Items:", True, FONT_COLOR), (bp_rect.left, debug_y_offset)); debug_y_offset += 25
         if placed_items:
-            item_strings = [f"{item.name} @ ({item.gx},{item.gy})" for item in placed_items.values()]
+            item_strings = [f"{item.name} @ {key}" for key, item in placed_items.items()]
             for i in range(0, len(item_strings), 2):
                 line_text = item_strings[i]
                 if i + 1 < len(item_strings): line_text += f",   {item_strings[i+1]}"
@@ -432,4 +441,3 @@ def game_loop():
 
 if __name__ == "__main__":
     game_loop()
-

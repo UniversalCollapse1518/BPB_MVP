@@ -67,8 +67,11 @@ class Item(pygame.sprite.Sprite):
         return None
 
     def get_body_offset(self) -> Tuple[int, int]:
-        bounds = self.get_body_bounds()
-        return (bounds[1], bounds[0]) if bounds else (0, 0)
+        for r, row in enumerate(self.shape_matrix):
+            for c, cell in enumerate(row):
+                if cell == GridType.OCCUPIED:
+                    return (c, r)
+        return (0, 0)
     
     def create_body_surface(self, grid_size, rarity_colors, font_color):
         width_px, height_px = self.grid_width * grid_size, self.grid_height * grid_size
@@ -113,19 +116,17 @@ class Item(pygame.sprite.Sprite):
         self.grid_height, self.grid_width = len(self.shape_matrix), len(self.shape_matrix[0])
         from main import GRID_SIZE, RARITY_BORDER_COLORS, FONT_COLOR
         self.body_image = self.create_body_surface(GRID_SIZE, RARITY_BORDER_COLORS, FONT_COLOR)
-        # Recreate the rect to get the new dimensions
         self.rect = self.body_image.get_rect()
         self._body_bounds = None
 
 
 class CalculationEngine:
     def __init__(self):
-        # --- NEW: Attributes for the neutral score pool ---
         self.neutral_pool_modifiers = []
         self.neutral_pool_total = 0.0
+        self.interaction_map = []
 
     def _check_condition(self, condition_data: dict, source_item: Item, target_item: Optional[Item], condition_logic: str = "AND") -> bool:
-        # ... (function is unchanged) ...
         if not condition_data: return True
         check_results = []
         if "requires_empty" in condition_data:
@@ -157,7 +158,6 @@ class CalculationEngine:
         return any(check_results) if condition_logic == "OR" else all(check_results)
 
     def _get_effect_value(self, effect_data: dict, source_item: Item) -> Any:
-        # ... (function is unchanged) ...
         value_data = effect_data.get("value", 0)
         if not isinstance(value_data, dict): return value_data
         final_value = value_data.get("base", 0.0)
@@ -169,9 +169,9 @@ class CalculationEngine:
         return final_value
         
     def run(self, placed_items: Dict[Any, Item], backpack_cols: int, backpack_rows: int):
-        # --- NEW: Reset neutral pool on each run ---
         self.neutral_pool_modifiers.clear()
         self.neutral_pool_total = 0.0
+        self.interaction_map = []
 
         occupancy_grid: List[List[Optional[Item]]] = [[None for _ in range(backpack_cols)] for _ in range(backpack_rows)]
         for item in placed_items.values():
@@ -185,7 +185,7 @@ class CalculationEngine:
                 for c, cell in enumerate(row):
                     if cell == GridType.OCCUPIED and 0 <= gy+r < backpack_rows and 0 <= gx+c < backpack_cols:
                         occupancy_grid[gy+r][gx+c] = item
-        # ... (element adding and star activation loops are unchanged) ...
+
         for source_item in placed_items.values():
             gx, gy = source_item.gx, source_item.gy
             for r, row in enumerate(source_item.shape_matrix):
@@ -263,7 +263,7 @@ class CalculationEngine:
                                 for effect_data in effects:
                                     logic = effect_data.get("condition_logic", "AND")
                                     if self._check_condition(effect_data.get("condition", {}), source_item, target_item, logic):
-                                        if "effect" in effect_data: # All score effects fall in here
+                                        if "effect" in effect_data:
                                             value = self._get_effect_value(effect_data, source_item)
                                             reason = f"Star {cell_type.name.split('_')[1]}"
                                             all_effects.append({"source": source_item, "target": target_item, "effect": effect_data["effect"], "value": value, "reason": reason})
@@ -273,7 +273,6 @@ class CalculationEngine:
                                         break
                                 if effect_applied_for_this_cell: break
         
-        # --- NEW: Loop to process neutral pool effects ---
         for eff in all_effects:
             if eff["effect"] == "ADD_TO_NEUTRAL_POOL":
                 try:
@@ -281,6 +280,8 @@ class CalculationEngine:
                     reason_text = f"from {eff['source'].name}'s {eff['reason']}"
                     self.neutral_pool_total += numeric_value
                     self.neutral_pool_modifiers.append(f"+{numeric_value:.1f} ({reason_text})")
+                    # --- NEW: Record neutral pool contribution as a self-synergy ---
+                    self.interaction_map.append((eff["source"].name, eff["source"].name))
                 except (ValueError, TypeError):
                     continue
 
@@ -293,9 +294,11 @@ class CalculationEngine:
                             reason_text = eff.get("reason", "self")
                             eff["source"].final_score += numeric_value
                             eff["source"].score_modifiers.append(f"+{numeric_value:.1f} ({reason_text})")
+                            self.interaction_map.append((eff["source"].name, eff["source"].name))
                         elif eff["target"]:
                             eff["target"].final_score += numeric_value
                             eff["target"].score_modifiers.append(f"+{numeric_value:.1f} from {eff['source'].name}")
+                            self.interaction_map.append((eff["source"].name, eff["target"].name))
                     except (ValueError, TypeError): continue
         
         for effect_type in ["MULTIPLY_SCORE_OF_SELF", "MULTIPLY_SCORE_OF_TARGET"]:
@@ -307,7 +310,9 @@ class CalculationEngine:
                             reason_text = eff.get("reason", "self")
                             eff["source"].final_score *= numeric_value
                             eff["source"].score_modifiers.append(f"x{numeric_value:.2f} ({reason_text})")
+                            self.interaction_map.append((eff["source"].name, eff["source"].name))
                         elif eff["target"]:
                             eff["target"].final_score *= numeric_value
                             eff["target"].score_modifiers.append(f"x{numeric_value:.2f} from {eff['source'].name}")
+                            self.interaction_map.append((eff["source"].name, eff["target"].name))
                     except (ValueError, TypeError): continue

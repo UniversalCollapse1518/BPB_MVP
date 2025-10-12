@@ -80,7 +80,7 @@
       "SPELL",
       "WEAPON"
     ],
-    "base_score": 20,
+    "base_score": 35,
     "has_cooldown": true,
     "is_start_of_battle": false,
     "shape_matrix": [
@@ -159,16 +159,16 @@
     "star_effects": {
       "STAR_A_1": [
         {
-          "effect": "ADD_SCORE_TO_TARGET",
-          "value": 80,
+          "effect": "MULTIPLY_SCORE_OF_TARGET",
+          "value": 2.2,
           "condition_logic": "AND",
           "condition": {
             "requires_name": "Null Blade"
           }
         },
         {
-          "effect": "ADD_SCORE_TO_TARGET",
-          "value": 40,
+          "effect": "MULTIPLY_SCORE_OF_TARGET",
+          "value": 1.5,
           "condition_logic": "AND",
           "condition": {
             "requires_type": "WEAPON"
@@ -178,7 +178,7 @@
       "STAR_B_1": [
         {
           "effect": "ADD_TO_NEUTRAL_POOL",
-          "value": 15,
+          "value": 25,
           "condition_logic": "AND",
           "condition": {
             "requires_element": "DARK"
@@ -460,7 +460,7 @@
     "types": [
       "FOOD"
     ],
-    "base_score": 5,
+    "base_score": 4,
     "has_cooldown": true,
     "is_start_of_battle": false,
     "shape_matrix": [
@@ -505,7 +505,7 @@
     "types": [
       "FOOD"
     ],
-    "base_score": 3,
+    "base_score": 4,
     "has_cooldown": true,
     "is_start_of_battle": false,
     "shape_matrix": [
@@ -663,7 +663,7 @@
     "types": [
       "PET"
     ],
-    "base_score": 25,
+    "base_score": 20,
     "has_cooldown": true,
     "is_start_of_battle": false,
     "shape_matrix": [
@@ -894,6 +894,379 @@
       [
         1
       ],
+      [
+        1
+      ],
+      [
+        1
+      ],
+      [
+        1
+      ]
+    ],
+    "passive_effects": [],
+    "star_effects": {}
+  },
+  "Pan": {
+    "name": "Pan",
+    "rarity": "COMMON",
+    "item_class": "NEUTRAL",
+    "elements": [
+      "MELEE"
+    ],
+    "types": [
+      "WEAPON"
+    ],
+    "base_score": 8,
+    "has_cooldown": true,
+    "is_start_of_battle": false,
+    "shape_matrix": [
+      [
+        0,
+        2,
+        0,
+        0
+      ],
+      [
+        2,
+        1,
+        2,
+        0
+      ],
+      [
+        2,
+        1,
+        1,
+        2
+      ],
+      [
+        0,
+        2,
+        2,
+        0
+      ]
+    ],
+    "passive_effects": [],
+    "star_effects": {
+      "STAR_A_1": [
+        {
+          "effect": "ADD_SCORE_TO_SELF",
+          "value": 1.5,
+          "condition_logic": "AND",
+          "condition": {
+            "requires_type": "FOOD"
+          }
+        }
+      ]
+    }
+  },
+  "Glove": {
+    "name": "Glove",
+    "rarity": "RARE",
+    "item_class": "NEUTRAL",
+    "elements": [],
+    "types": [
+      "ACCESSORY",
+      "GLOVE"
+    ],
+    "base_score": 0,
+    "has_cooldown": false,
+    "is_start_of_battle": true,
+    "shape_matrix": [
+      [
+        2,
+        1,
+        1,
+        2
+      ]
+    ],
+    "passive_effects": [],
+    "star_effects": {
+      "STAR_A_1": [
+        {
+          "effect": "MULTIPLY_SCORE_OF_TARGET",
+          "value": 1.2,
+          "condition_logic": "AND",
+          "condition": {
+            "requires_cooldown": true
+          }
+        }
+      ]
+    }
+  },
+  "Wand": {
+    "name": "Wand",
+    "rarity": "COMMON",
+    "item_class": "MAGE",
+    "elements": [
+      "MAGIC"
+    ],
+    "types": [
+      "ACCESSORY"
+    ],
+    "base_score": 10,
+    "has_cooldown": true,
+    "is_start_of_battle": false,
+    "shape_matrix": [
+      [
+        1
+      ],
+      [
+        1
+      ]
+    ],
+    "passive_effects": [],
+    "star_effects": {}
+  },
+  "GreenScroll": {
+    "name": "Green Scroll",
+    "rarity": "RARE",
+    "item_class": "MAGE",
+    "elements": [
+      "MAGIC",
+      "NATURE"
+    ],
+    "types": [
+      "SPELL"
+    ],
+    "base_score": 0,
+    "has_cooldown": false,
+    "is_start_of_battle": false,
+    "shape_matrix": [
+      [
+        0,
+        2,
+        2,
+        0
+      ],
+      [
+        2,
+        1,
+        1,
+        2
+      ],
+      [
+        0,
+        2,
+        2,
+        0
+      ]
+    ],
+    "passive_effects": [],
+    "star_effects": {
+      "STAR_A_1": [
+        {
+          "effect": "ADD_SCORE_TO_TARGET",
+          "value": 3,
+          "condition_logic": "AND",
+          "condition": {
+            "requires_type": "WEAPON"
+          }
+        }
+      ]
+    }
+  },
+  "GreenBook": {
+    "name": "Green Book",
+    "rarity": "EPIC",
+    "item_class": "MAGE",
+    "elements": [
+      "MAGIC",
+      "NATURE"
+    ],
+    "types": [
+      "BOOK"
+    ],
+    "base_score": 15,
+    "has_cooldown": true,
+    "is_start_of_battle": false,
+    "shape_matrix": [
+      [
+        0,
+        2,
+        2,
+        2,
+        0
+      ],
+      [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      [
+        0,
+        2,
+        1,
+        2,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0,
+        0
+      ]
+    ],
+    "passive_effects": [],
+    "star_effects": {
+      "STAR_A_1": [
+        {
+          "effect": "MULTIPLY_SCORE_OF_SELF",
+          "value": 1.2,
+          "condition_logic": "AND",
+          "condition": {
+            "requires_element": "NATURE",
+            "requires_type": "SPELL"
+          }
+        },
+        {
+          "effect": "MULTIPLY_SCORE_OF_SELF",
+          "value": 1.1,
+          "condition_logic": "AND",
+          "condition": {
+            "requires_type": "SPELL"
+          }
+        }
+      ]
+    }
+  },
+  "Rabbit": {
+    "name": "Rabbit",
+    "rarity": "GODLY",
+    "item_class": "MAGE",
+    "elements": [
+      "NATURE"
+    ],
+    "types": [
+      "PET"
+    ],
+    "base_score": 12,
+    "has_cooldown": true,
+    "is_start_of_battle": false,
+    "shape_matrix": [
+      [
+        0,
+        2,
+        2,
+        0
+      ],
+      [
+        2,
+        1,
+        1,
+        2
+      ],
+      [
+        2,
+        1,
+        1,
+        2
+      ],
+      [
+        0,
+        2,
+        2,
+        0
+      ]
+    ],
+    "passive_effects": [],
+    "star_effects": {
+      "STAR_A_1": [
+        {
+          "effect": "MULTIPLY_SCORE_OF_SELF",
+          "value": 1.15,
+          "condition_logic": "AND",
+          "condition": {
+            "requires_type": "PET"
+          }
+        }
+      ]
+    }
+  },
+  "Darkhelmet": {
+    "name": "Dark helmet",
+    "rarity": "LEGENDARY",
+    "item_class": "NEUTRAL",
+    "elements": [
+      "DARK"
+    ],
+    "types": [
+      "HELMET"
+    ],
+    "base_score": 35,
+    "has_cooldown": false,
+    "is_start_of_battle": true,
+    "shape_matrix": [
+      [
+        1
+      ],
+      [
+        1
+      ]
+    ],
+    "passive_effects": [],
+    "star_effects": {}
+  },
+  "Battlecry": {
+    "name": "Battlecry",
+    "rarity": "UNIQUE",
+    "item_class": "NEUTRAL",
+    "elements": [],
+    "types": [
+      "SKILL"
+    ],
+    "base_score": 0,
+    "has_cooldown": false,
+    "is_start_of_battle": false,
+    "shape_matrix": [
+      [
+        2,
+        2,
+        2
+      ],
+      [
+        2,
+        1,
+        2
+      ],
+      [
+        2,
+        2,
+        2
+      ]
+    ],
+    "passive_effects": [],
+    "star_effects": {
+      "STAR_A_1": [
+        {
+          "effect": "MULTIPLY_SCORE_OF_TARGET",
+          "value": 2,
+          "condition_logic": "AND",
+          "condition": {
+            "requires_start_of_battle": true
+          }
+        }
+      ]
+    }
+  },
+  "BloodBlade": {
+    "name": "Blood Blade",
+    "rarity": "EPIC",
+    "item_class": "NEUTRAL",
+    "elements": [
+      "MELEE",
+      "VAMPIRIC"
+    ],
+    "types": [
+      "WEAPON"
+    ],
+    "base_score": 18,
+    "has_cooldown": true,
+    "is_start_of_battle": false,
+    "shape_matrix": [
       [
         1
       ],

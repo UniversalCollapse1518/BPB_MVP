@@ -33,7 +33,7 @@ class Element(Enum):
 class ItemType(Enum):
     WEAPON = "Weapon"; SHIELD = "Shield"; ACCESSORY = "Accessory"; POTION = "Potion"
     SPELL = "Spell"; FOOD = "Food"; BOOK = "Book"; PET = "Pet"; HELMET = "Helmet"
-    ARMOR = "Armor"; GEMSTONE = "Gemstone"; SKILL = "Skill"
+    ARMOR = "Armor"; GEMSTONE = "Gemstone"; SKILL = "Skill"; GLOVE="Glove"
 
 # --- Lists for Editor Dropdowns ---
 EFFECT_TYPES = [
