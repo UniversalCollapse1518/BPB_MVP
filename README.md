@@ -2,7 +2,7 @@
 
 This project is an advanced tool designed to simulate, analyze, and solve optimal item builds for the game Backpack Battles. It consists of a manual simulator, a GUI item editor, and a suite of powerful automated layout solvers.
 
-For a brief video introduction (in Chinese), please see: 【背包乱斗摆盘求解小玩具-功能介绍与画面展示】 [https://www.bilibili.com/video/BV14v4czhEwQ/](https://www.google.com/search?q=https://www.bilibili.com/video/BV14v4czhEwQ/)
+For a brief video introduction (in Chinese), please see: 【背包乱斗摆盘求解小玩具-功能介绍与画面展示】 [https://www.bilibili.com/video/BV14v4czhEwQ/](https://www.bilibili.com/video/BV14v4czhEwQ/)
 
 * * *
 
