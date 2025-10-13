@@ -8,7 +8,8 @@ class Item(pygame.sprite.Sprite):
     def __init__(self, x: int, y: int, name: str, rarity: Rarity,
                  item_class: ItemClass, elements: List[Element], types: List[ItemType],
                  shape_matrix: List[List[GridType]], base_score: int, star_effects: dict,
-                 has_cooldown: bool = False, is_start_of_battle: bool = False, passive_effects: List[dict] = None):
+                 has_cooldown: bool = False, is_start_of_battle: bool = False, 
+                 passive_effects: List[dict] = None, visuals: bool = True):
         super().__init__()
         self.name = name
         self.rarity = rarity
@@ -25,9 +26,12 @@ class Item(pygame.sprite.Sprite):
         self.grid_width = len(shape_matrix[0]) if shape_matrix else 0
         self.grid_height = len(shape_matrix)
         
-        from main import GRID_SIZE, RARITY_BORDER_COLORS, FONT_COLOR
-        self.body_image = self.create_body_surface(GRID_SIZE, RARITY_BORDER_COLORS, FONT_COLOR)
-        self.rect = self.body_image.get_rect(topleft=(x, y))
+        self.body_image = None
+        self.rect = None
+        if visuals:
+            from main import GRID_SIZE, RARITY_BORDER_COLORS, FONT_COLOR
+            self.body_image = self.create_body_surface(GRID_SIZE, RARITY_BORDER_COLORS, FONT_COLOR)
+            self.rect = self.body_image.get_rect(topleft=(x, y))
 
         self.base_y = y
         self.dragging = False
@@ -43,13 +47,20 @@ class Item(pygame.sprite.Sprite):
         
         self._body_bounds = None
 
-    def clone(self):
+    def clone(self, visuals: Optional[bool] = None):
+        # If visuals is not specified, copy the state of the original item.
+        # If it is specified (e.g., False), override it.
+        has_visuals = self.body_image is not None
+        if visuals is not None:
+            has_visuals = visuals
+
         new_item = Item(
             x=self.rect.x if self.rect else 0, y=self.rect.y if self.rect else 0, 
             name=self.name, rarity=self.rarity, item_class=self.item_class,
             elements=list(self.elements), types=list(self.types), shape_matrix=copy.deepcopy(self.shape_matrix),
             base_score=self.base_score, star_effects=copy.deepcopy(self.star_effects), has_cooldown=self.has_cooldown,
-            is_start_of_battle=self.is_start_of_battle, passive_effects=copy.deepcopy(self.passive_effects)
+            is_start_of_battle=self.is_start_of_battle, passive_effects=copy.deepcopy(self.passive_effects),
+            visuals=has_visuals
         )
         new_item.gx, new_item.gy = self.gx, self.gy
         return new_item
@@ -114,11 +125,11 @@ class Item(pygame.sprite.Sprite):
     def rotate(self):
         self.shape_matrix = [list(row)[::-1] for row in zip(*self.shape_matrix)]
         self.grid_height, self.grid_width = len(self.shape_matrix), len(self.shape_matrix[0])
-        from main import GRID_SIZE, RARITY_BORDER_COLORS, FONT_COLOR
-        self.body_image = self.create_body_surface(GRID_SIZE, RARITY_BORDER_COLORS, FONT_COLOR)
-        self.rect = self.body_image.get_rect()
+        if self.body_image:
+            from main import GRID_SIZE, RARITY_BORDER_COLORS, FONT_COLOR
+            self.body_image = self.create_body_surface(GRID_SIZE, RARITY_BORDER_COLORS, FONT_COLOR)
+            self.rect = self.body_image.get_rect()
         self._body_bounds = None
-
 
 class CalculationEngine:
     def __init__(self):

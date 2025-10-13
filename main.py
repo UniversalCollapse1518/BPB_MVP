@@ -9,6 +9,7 @@ from typing import List, Dict, Tuple, Type
 from tkinter import filedialog
 import tkinter as tk
 from datetime import datetime
+import time # Import the time module
 
 from definitions import GridType, Rarity, ItemClass, Element, ItemType
 from engine import Item, CalculationEngine
@@ -18,18 +19,21 @@ from solvers.base_solver import BaseSolver
 root = tk.Tk()
 root.withdraw()
 
-# --- MODIFIED: Final adjusted panel widths ---
 SCREEN_WIDTH = 1600
-SCREEN_HEIGHT = 768
+SCREEN_HEIGHT = 900
 GRID_SIZE = 40
 BACKPACK_COLS, BACKPACK_ROWS = 9, 7
-BACKPACK_X, BACKPACK_Y = 50, 50
+
+TOOLBAR_Y = 10
+BACKPACK_Y = TOOLBAR_Y + 100
+BACKPACK_X = 50
+PANEL_Y = TOOLBAR_Y
+
 PANEL_START_X = BACKPACK_X + (BACKPACK_COLS * GRID_SIZE) + 50
-PANEL_Y = 50
-PANEL_HEIGHT = 630
+PANEL_HEIGHT = 750
 SHOP_WIDTH = 300
-INFO_PANEL_WIDTH = 420  # Reduced width
-NEUTRAL_PANEL_WIDTH = 380 # Increased width
+INFO_PANEL_WIDTH = 420
+NEUTRAL_PANEL_WIDTH = 380
 SHOP_X = PANEL_START_X
 INFO_PANEL_X = SHOP_X + SHOP_WIDTH + 20
 NEUTRAL_PANEL_X = INFO_PANEL_X + INFO_PANEL_WIDTH + 20
@@ -121,7 +125,7 @@ def load_items_from_file(filepath: str) -> List[Item]:
 def discover_solvers() -> Dict[str, Type[BaseSolver]]:
     solvers = {}
     solver_dir = 'solvers'
-    def format_name(name): return name.replace('Solver', '')
+    def format_name(name): return name.replace('V2', 'V2').replace('Solver', '')
     for filename in os.listdir(solver_dir):
         if filename.endswith('.py') and not filename.startswith('base'):
             module_name = f"{solver_dir}.{filename[:-3]}"
@@ -132,7 +136,6 @@ def discover_solvers() -> Dict[str, Type[BaseSolver]]:
                 for name, obj in inspect.getmembers(module, inspect.isclass):
                     if issubclass(obj, BaseSolver) and obj is not BaseSolver: 
                         solvers[format_name(name)] = obj
-    # Sort solvers alphabetically for consistent order
     return dict(sorted(solvers.items()))
 
 def is_placement_valid(item: Item, gx: int, gy: int, items_dict: Dict[Tuple[int, int], Item]) -> bool:
@@ -173,16 +176,13 @@ def game_loop():
     font_small = pygame.font.SysFont('verdana', 21)
     font_button = pygame.font.SysFont('verdana', 18)
 
-    dropdown_y = BACKPACK_Y + (BACKPACK_ROWS * GRID_SIZE) + 20
+    dropdown_y = TOOLBAR_Y
     dropdown_width = 220
     dropdown_rect = pygame.Rect(BACKPACK_X, dropdown_y, dropdown_width, 40)
     run_solver_button = pygame.Rect(dropdown_rect.right + 10, dropdown_y, 130, 40)
     dropdown_open = False
 
-    # --- FIX: Move Save/Load buttons down to make space for the dropdown menu ---
-    dropdown_options_height = len(solver_names) * 30  # Each option is 30px tall
-    save_load_y = dropdown_rect.bottom + dropdown_options_height + 20 # Add extra padding
-    
+    save_load_y = dropdown_rect.bottom + 10
     save_button = pygame.Rect(BACKPACK_X, save_load_y, 175, 40)
     load_button = pygame.Rect(save_button.right + 10, save_load_y, 175, 40)
 
@@ -190,8 +190,12 @@ def game_loop():
     info_panel_rect = pygame.Rect(INFO_PANEL_X, PANEL_Y, INFO_PANEL_WIDTH, PANEL_HEIGHT)
     neutral_panel_rect = pygame.Rect(NEUTRAL_PANEL_X, PANEL_Y, NEUTRAL_PANEL_WIDTH, PANEL_HEIGHT)
     
-    total_score_rect = pygame.Rect(PANEL_START_X, info_panel_rect.bottom + 5, SCREEN_WIDTH - PANEL_START_X - 30, 45)
-    calc_button = pygame.Rect(PANEL_START_X, total_score_rect.bottom + 5, 150, 40)
+    ui_column_x = SHOP_X
+    ui_column_y = PANEL_Y + PANEL_HEIGHT + 20 
+
+    calc_button_width = 150
+    calc_button = pygame.Rect(ui_column_x, ui_column_y + 50, calc_button_width, 40)
+    total_score_rect = pygame.Rect(ui_column_x, ui_column_y, calc_button_width, 45)
     calc_text_surf = font_medium.render("Calculate", True, FONT_COLOR)
 
     shop_scroll_y, info_scroll_y, neutral_scroll_y = 0, 0, 0
@@ -248,7 +252,7 @@ def game_loop():
                                 break
                     
                     if clicked_on_dropdown_option:
-                        pass # Don't process other clicks if a dropdown option was chosen
+                        pass
                     elif dropdown_rect.collidepoint(mouse_pos):
                         dropdown_open = not dropdown_open
                     elif save_button.collidepoint(mouse_pos):
@@ -266,14 +270,39 @@ def game_loop():
                         else:
                             SolverClass = available_solvers[selected_solver_name]
                             solver_instance = SolverClass(items_in_backpack, BACKPACK_COLS, BACKPACK_ROWS, initial_layout=placed_items)
+                            
                             print(f"Running {selected_solver_name} Solver...")
+                            start_time = time.time()
+                            
                             best_layout, best_score = solver_instance.solve()
-                            placed_items = best_layout
+                            
+                            end_time = time.time()
+                            elapsed_time = end_time - start_time
+                            print(f"Solver finished in {elapsed_time:.2f} seconds.")
+                            
+                            # --- FIX: Re-create visual items from the solver's data-only results ---
+                            visual_layout = {}
+                            for key, data_item in best_layout.items():
+                                visual_item = Item(
+                                    x=0, y=0, name=data_item.name, rarity=data_item.rarity,
+                                    item_class=data_item.item_class, elements=data_item.elements,
+                                    types=data_item.types, shape_matrix=data_item.shape_matrix,
+                                    base_score=data_item.base_score, star_effects=data_item.star_effects,
+                                    has_cooldown=data_item.has_cooldown, is_start_of_battle=data_item.is_start_of_battle,
+                                    passive_effects=data_item.passive_effects, visuals=True
+                                )
+                                visual_item.gx = data_item.gx
+                                visual_item.gy = data_item.gy
+                                visual_layout[key] = visual_item
+                            
+                            placed_items = visual_layout
+                            # --- END FIX ---
+
                             engine.run(placed_items, BACKPACK_COLS, BACKPACK_ROWS)
                             total_score = sum(item.final_score for item in placed_items.values()) + engine.neutral_pool_total
                         dropdown_open = False
                     else:
-                        dropdown_open = False # Close dropdown if clicking anywhere else
+                        dropdown_open = False
                         item_to_pick_info = None
                         for key, item in reversed(list(placed_items.items())):
                             item_pos_on_screen = (BACKPACK_X + item.gx * GRID_SIZE, BACKPACK_Y + item.gy * GRID_SIZE)
@@ -358,7 +387,6 @@ def game_loop():
             screen.blit(font_small.render(mod, True, (100, 20, 20)), (neutral_panel_rect.x + 25, neutral_panel_rect.y + y_off_neutral - neutral_scroll_y)); y_off_neutral += 25
         screen.set_clip(None)
 
-
         total_score_surf = font_large.render(f"Total Score: {total_score:.1f}", True, FONT_COLOR)
         screen.blit(total_score_surf, total_score_surf.get_rect(center=total_score_rect.center))
 
@@ -371,12 +399,13 @@ def game_loop():
             if item.is_mouse_over_body(mouse_pos, pos):
                 hovered_item_to_draw_stars = (item, pos)
 
-            if pos[0] < SHOP_X:
+            if item.gx != -1: 
                 screen.blit(item.body_image, pos)
-            elif shop_area_rect.colliderect(pygame.Rect(pos, item.body_image.get_size())):
-                screen.set_clip(shop_area_rect)
-                screen.blit(item.body_image, pos)
-                screen.set_clip(None)
+            else: 
+                if shop_area_rect.colliderect(pygame.Rect(pos, item.body_image.get_size())):
+                    screen.set_clip(shop_area_rect)
+                    screen.blit(item.body_image, pos)
+                    screen.set_clip(None)
 
         if selected_item and selected_item.dragging:
             screen.blit(selected_item.body_image, selected_item.rect)
@@ -406,8 +435,8 @@ def game_loop():
         pygame.draw.rect(screen, (180, 200, 200), load_button)
         load_text = font_button.render("Load Layout", True, FONT_COLOR)
         screen.blit(load_text, load_text.get_rect(center=load_button.center))
-
-        debug_y_offset = dropdown_rect.bottom + 40
+        
+        debug_y_offset = BACKPACK_Y + (BACKPACK_ROWS * GRID_SIZE) + 20
         mouse_pos_text = f"Mouse Position: {mouse_pos}"
         screen.blit(font_small.render(mouse_pos_text, True, FONT_COLOR), (bp_rect.left, debug_y_offset)); debug_y_offset += 25
         dragging_item_text = f"Dragging: {selected_item.name if selected_item else 'None'}"

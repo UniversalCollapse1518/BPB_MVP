@@ -1,2 +1,5 @@
 pygame==2.5.2
 customtkinter
+gymnasium
+stable-baselines3[extra]
+sb3-contrib

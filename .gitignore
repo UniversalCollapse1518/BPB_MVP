@@ -24,3 +24,13 @@ dist/
 # Custom test files and layouts
 layout/
 test.json
+
+# --- NEW RULES ---
+
+# Reinforcement Learning model files and logs
+*.zip
+ppo_*/
+ppo_*_tensorboard/
+
+# Redundant project archives
+BPB_MVP.zip
