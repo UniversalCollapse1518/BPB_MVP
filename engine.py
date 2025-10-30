@@ -2,14 +2,20 @@ import pygame
 from typing import List, Optional, Dict, Tuple, Any
 import math
 import copy
+import os  # <-- 新增
 from definitions import GridType, Rarity, ItemClass, Element, ItemType
+
+# --- 新增：定义图片文件夹 ---
+WIKI_IMAGES_FOLDER = "wiki_images"
+
 
 class Item(pygame.sprite.Sprite):
     def __init__(self, x: int, y: int, name: str, rarity: Rarity,
                  item_class: ItemClass, elements: List[Element], types: List[ItemType],
                  shape_matrix: List[List[GridType]], base_score: int, star_effects: dict,
-                 has_cooldown: bool = False, is_start_of_battle: bool = False, 
-                 passive_effects: List[dict] = None, visuals: bool = True):
+                 has_cooldown: bool = False, is_start_of_battle: bool = False,
+                 passive_effects: List[dict] = None, visuals: bool = True,
+                 image_file: Optional[str] = None):  # <-- V3 新增 image_file 参数
         super().__init__()
         self.name = name
         self.rarity = rarity
@@ -22,50 +28,72 @@ class Item(pygame.sprite.Sprite):
         self.has_cooldown = has_cooldown
         self.is_start_of_battle = is_start_of_battle
         self.passive_effects = passive_effects if passive_effects is not None else []
+        self.image_file = image_file  # <-- V3 新增
 
         self.grid_width = len(shape_matrix[0]) if shape_matrix else 0
         self.grid_height = len(shape_matrix)
-        
+
         self.body_image = None
         self.rect = None
         if visuals:
-            from main import GRID_SIZE, RARITY_BORDER_COLORS, FONT_COLOR
-            self.body_image = self.create_body_surface(GRID_SIZE, RARITY_BORDER_COLORS, FONT_COLOR)
-            self.rect = self.body_image.get_rect(topleft=(x, y))
+            # --- V3 逻辑更新：优先加载真实图片 ---
+            image_loaded = False
+            if self.image_file:
+                try:
+                    # 尝试从 wiki_images 加载
+                    image_path = os.path.join(WIKI_IMAGES_FOLDER, self.image_file)
+                    if os.path.exists(image_path):
+                        self.body_image = pygame.image.load(image_path).convert_alpha()
+                        # 基于 grid_width 和 grid_height 缩放图片
+                        from main import GRID_SIZE
+                        expected_w = self.grid_width * GRID_SIZE
+                        expected_h = self.grid_height * GRID_SIZE
+                        self.body_image = pygame.transform.scale(self.body_image, (expected_w, expected_h))
+                        self.rect = self.body_image.get_rect(topleft=(x, y))
+                        image_loaded = True
+                except Exception as e:
+                    print(f"警告：加载图片 {self.image_file} 失败: {e}")
+
+            # 如果加载图片失败，或者没有图片文件，回退到旧的灰色方块
+            if not image_loaded:
+                from main import GRID_SIZE, RARITY_BORDER_COLORS, FONT_COLOR
+                self.body_image = self.create_body_surface(GRID_SIZE, RARITY_BORDER_COLORS, FONT_COLOR)
+                self.rect = self.body_image.get_rect(topleft=(x, y))
+            # --- V3 逻辑结束 ---
 
         self.base_y = y
         self.dragging = False
 
         self.gx = -1
         self.gy = -1
-        
+
         self.final_score = 0
         self.score_modifiers = []
         self.activated_stars = {GridType.STAR_A: 0, GridType.STAR_B: 0, GridType.STAR_C: 0}
         self.occupying_stars = []
         self.temporary_elements = []
-        
+
         self._body_bounds = None
 
     def clone(self, visuals: Optional[bool] = None):
-        # If visuals is not specified, copy the state of the original item.
-        # If it is specified (e.g., False), override it.
         has_visuals = self.body_image is not None
         if visuals is not None:
             has_visuals = visuals
 
         new_item = Item(
-            x=self.rect.x if self.rect else 0, y=self.rect.y if self.rect else 0, 
+            x=self.rect.x if self.rect else 0, y=self.rect.y if self.rect else 0,
             name=self.name, rarity=self.rarity, item_class=self.item_class,
             elements=list(self.elements), types=list(self.types), shape_matrix=copy.deepcopy(self.shape_matrix),
             base_score=self.base_score, star_effects=copy.deepcopy(self.star_effects), has_cooldown=self.has_cooldown,
             is_start_of_battle=self.is_start_of_battle, passive_effects=copy.deepcopy(self.passive_effects),
-            visuals=has_visuals
+            visuals=has_visuals,
+            image_file=self.image_file  # <-- V3 新增：确保 clone 时传递 image_file
         )
         new_item.gx, new_item.gy = self.gx, self.gy
         return new_item
 
     def get_body_bounds(self) -> Optional[Tuple[int, int, int, int]]:
+        # ... (此函数保持不变) ...
         if self._body_bounds: return self._body_bounds
         min_r, max_r, min_c, max_c = self.grid_height, -1, self.grid_width, -1
         found_body = False
@@ -78,22 +106,26 @@ class Item(pygame.sprite.Sprite):
         return None
 
     def get_body_offset(self) -> Tuple[int, int]:
+        # ... (此函数保持不变) ...
         for r, row in enumerate(self.shape_matrix):
             for c, cell in enumerate(row):
                 if cell == GridType.OCCUPIED:
                     return (c, r)
         return (0, 0)
-    
+
     def create_body_surface(self, grid_size, rarity_colors, font_color):
+        # ... (此函数保持不变, 作为备用方案) ...
         width_px, height_px = self.grid_width * grid_size, self.grid_height * grid_size
         surface = pygame.Surface((width_px, height_px), pygame.SRCALPHA)
-        occupied_coords = [(c, r) for r, row in enumerate(self.shape_matrix) for c, cell in enumerate(row) if cell == GridType.OCCUPIED]
+        occupied_coords = [(c, r) for r, row in enumerate(self.shape_matrix) for c, cell in enumerate(row) if
+                           cell == GridType.OCCUPIED]
         if occupied_coords:
             for c, r in occupied_coords:
                 pygame.draw.rect(surface, (200, 200, 200), (c * grid_size, r * grid_size, grid_size, grid_size))
-                pygame.draw.rect(surface, rarity_colors[self.rarity], (c * grid_size, r * grid_size, grid_size, grid_size), 2)
-            min_c, max_c = min(c for c,r in occupied_coords), max(c for c,r in occupied_coords)
-            min_r, max_r = min(r for c,r in occupied_coords), max(r for c,r in occupied_coords)
+                pygame.draw.rect(surface, rarity_colors[self.rarity],
+                                 (c * grid_size, r * grid_size, grid_size, grid_size), 2)
+            min_c, max_c = min(c for c, r in occupied_coords), max(c for c, r in occupied_coords)
+            min_r, max_r = min(r for c, r in occupied_coords), max(r for c, r in occupied_coords)
             center_x, center_y = (min_c + max_c + 1) * grid_size / 2, (min_r + max_r + 1) * grid_size / 2
             font = pygame.font.SysFont(None, 20)
             name_text = (self.name[:4] + '..') if len(self.name) > 6 else self.name
@@ -102,42 +134,65 @@ class Item(pygame.sprite.Sprite):
         return surface
 
     def draw_stars(self, screen: pygame.Surface, top_left_pos: Tuple[int, int]):
+        # ... (此函数保持不变) ...
         from main import GRID_SIZE, STAR_SHAPE_COLORS
         for r, row in enumerate(self.shape_matrix):
             for c, cell in enumerate(row):
                 if cell in STAR_SHAPE_COLORS:
-                    cx, cy = top_left_pos[0] + c*GRID_SIZE + GRID_SIZE//2, top_left_pos[1] + r*GRID_SIZE + GRID_SIZE//2
+                    cx, cy = top_left_pos[0] + c * GRID_SIZE + GRID_SIZE // 2, top_left_pos[
+                        1] + r * GRID_SIZE + GRID_SIZE // 2
                     color = STAR_SHAPE_COLORS[cell]
                     if cell == GridType.STAR_A:
-                        pts = [(cx + (GRID_SIZE/2 if a==18 else GRID_SIZE/4)*math.cos(math.radians(a+i*72)), cy + (GRID_SIZE/2 if a==18 else GRID_SIZE/4)*math.sin(math.radians(a+i*72))) for i in range(5) for a in [18,54]]
+                        pts = [(cx + (GRID_SIZE / 2 if a == 18 else GRID_SIZE / 4) * math.cos(math.radians(a + i * 72)),
+                                cy + (GRID_SIZE / 2 if a == 18 else GRID_SIZE / 4) * math.sin(math.radians(a + i * 72)))
+                               for i in range(5) for a in [18, 54]]
                         pygame.draw.polygon(screen, color, pts)
-                    elif cell == GridType.STAR_B: pygame.draw.polygon(screen, color, [(cx,cy-GRID_SIZE*0.4),(cx+GRID_SIZE*0.4,cy),(cx,cy+GRID_SIZE*0.4),(cx-GRID_SIZE*0.4,cy)])
-                    elif cell == GridType.STAR_C: pygame.draw.polygon(screen, color, [(cx,cy-GRID_SIZE*0.35),(cx-GRID_SIZE*0.35,cy+GRID_SIZE*0.35),(cx+GRID_SIZE*0.35,cy+GRID_SIZE*0.35)])
+                    elif cell == GridType.STAR_B:
+                        pygame.draw.polygon(screen, color, [(cx, cy - GRID_SIZE * 0.4), (cx + GRID_SIZE * 0.4, cy),
+                                                            (cx, cy + GRID_SIZE * 0.4), (cx - GRID_SIZE * 0.4, cy)])
+                    elif cell == GridType.STAR_C:
+                        pygame.draw.polygon(screen, color, [(cx, cy - GRID_SIZE * 0.35),
+                                                            (cx - GRID_SIZE * 0.35, cy + GRID_SIZE * 0.35),
+                                                            (cx + GRID_SIZE * 0.35, cy + GRID_SIZE * 0.35)])
 
     def is_mouse_over_body(self, mouse_pos: Tuple[int, int], current_pos: Tuple[int, int]) -> bool:
+        # ... (此函数保持不变) ...
         from main import GRID_SIZE
         for r, row in enumerate(self.shape_matrix):
             for c, cell in enumerate(row):
-                if cell == GridType.OCCUPIED and self.rect and pygame.Rect(current_pos[0]+c*GRID_SIZE, current_pos[1]+r*GRID_SIZE, GRID_SIZE, GRID_SIZE).collidepoint(mouse_pos):
+                if cell == GridType.OCCUPIED and self.rect and pygame.Rect(current_pos[0] + c * GRID_SIZE,
+                                                                           current_pos[1] + r * GRID_SIZE, GRID_SIZE,
+                                                                           GRID_SIZE).collidepoint(mouse_pos):
                     return True
         return False
-        
+
     def rotate(self):
+        # ... (此函数保持不变, 旋转只影响 shape_matrix, 图片的旋转在 main.py 中处理) ...
         self.shape_matrix = [list(row)[::-1] for row in zip(*self.shape_matrix)]
         self.grid_height, self.grid_width = len(self.shape_matrix), len(self.shape_matrix[0])
-        if self.body_image:
+
+        # --- V3 更新：如果用的是真实图片，我们也需要旋转它 ---
+        if self.body_image and self.image_file:  # 只旋转真实图片，不旋转灰色方块
+            self.body_image = pygame.transform.rotate(self.body_image, 90)
+            self.rect = self.body_image.get_rect()
+        elif self.body_image:  # 否则，重绘灰色方块
             from main import GRID_SIZE, RARITY_BORDER_COLORS, FONT_COLOR
             self.body_image = self.create_body_surface(GRID_SIZE, RARITY_BORDER_COLORS, FONT_COLOR)
             self.rect = self.body_image.get_rect()
+        # ---------------------------------------------
         self._body_bounds = None
 
+
+# --- CalculationEngine 类 (完全保持不变) ---
 class CalculationEngine:
     def __init__(self):
+        # ... (此类中的所有代码保持不变) ...
         self.neutral_pool_modifiers = []
         self.neutral_pool_total = 0.0
         self.interaction_map = []
 
-    def _check_condition(self, condition_data: dict, source_item: Item, target_item: Optional[Item], condition_logic: str = "AND") -> bool:
+    def _check_condition(self, condition_data: dict, source_item: Item, target_item: Optional[Item],
+                         condition_logic: str = "AND") -> bool:
         if not condition_data: return True
         check_results = []
         if "requires_empty" in condition_data:
@@ -159,9 +214,11 @@ class CalculationEngine:
             if "must_be_different" in condition_data:
                 if condition_data["must_be_different"]: check_results.append(source_item.name != target_item.name)
             if "requires_cooldown" in condition_data:
-                if condition_data["requires_cooldown"]: check_results.append(getattr(target_item, 'has_cooldown', False))
+                if condition_data["requires_cooldown"]: check_results.append(
+                    getattr(target_item, 'has_cooldown', False))
             if "requires_start_of_battle" in condition_data:
-                if condition_data["requires_start_of_battle"]: check_results.append(getattr(target_item, 'is_start_of_battle', False))
+                if condition_data["requires_start_of_battle"]: check_results.append(
+                    getattr(target_item, 'is_start_of_battle', False))
         else:
             for key in condition_data:
                 if key != "requires_empty": check_results.append(False)
@@ -178,24 +235,26 @@ class CalculationEngine:
             num_activated = source_item.activated_stars.get(per_star_type, 0)
             final_value += num_activated * bonus_data.get("add", 0)
         return final_value
-        
+
     def run(self, placed_items: Dict[Any, Item], backpack_cols: int, backpack_rows: int):
+        # ... (此函数中的所有代码保持不变) ...
         self.neutral_pool_modifiers.clear()
         self.neutral_pool_total = 0.0
         self.interaction_map = []
 
-        occupancy_grid: List[List[Optional[Item]]] = [[None for _ in range(backpack_cols)] for _ in range(backpack_rows)]
+        occupancy_grid: List[List[Optional[Item]]] = [[None for _ in range(backpack_cols)] for _ in
+                                                      range(backpack_rows)]
         for item in placed_items.values():
             item.final_score = item.base_score
             item.score_modifiers, item.occupying_stars, item.temporary_elements = [], [], []
             item.activated_stars = {GridType.STAR_A: 0, GridType.STAR_B: 0, GridType.STAR_C: 0}
-        
+
         for item in placed_items.values():
             gx, gy = item.gx, item.gy
             for r, row in enumerate(item.shape_matrix):
                 for c, cell in enumerate(row):
-                    if cell == GridType.OCCUPIED and 0 <= gy+r < backpack_rows and 0 <= gx+c < backpack_cols:
-                        occupancy_grid[gy+r][gx+c] = item
+                    if cell == GridType.OCCUPIED and 0 <= gy + r < backpack_rows and 0 <= gx + c < backpack_cols:
+                        occupancy_grid[gy + r][gx + c] = item
 
         for source_item in placed_items.values():
             gx, gy = source_item.gx, source_item.gy
@@ -208,15 +267,20 @@ class CalculationEngine:
                                 effects, logic = (source_item.star_effects.get(star_key, []), "AND")
                                 if not isinstance(effects, list): effects = [effects]
                                 abs_x, abs_y = gx + c, gy + r
-                                target_item = occupancy_grid[abs_y][abs_x] if 0 <= abs_y < backpack_rows and 0 <= abs_x < backpack_cols else None
+                                target_item = occupancy_grid[abs_y][
+                                    abs_x] if 0 <= abs_y < backpack_rows and 0 <= abs_x < backpack_cols else None
                                 for effect_data in effects:
                                     logic = effect_data.get("condition_logic", "AND")
-                                    if effect_data.get("effect") == "ADD_ELEMENT_TO_TARGET" and self._check_condition(effect_data.get("condition", {}), source_item, target_item, logic):
+                                    if effect_data.get("effect") == "ADD_ELEMENT_TO_TARGET" and self._check_condition(
+                                            effect_data.get("condition", {}), source_item, target_item, logic):
                                         if target_item:
                                             try:
                                                 element_to_add = Element[effect_data["value"].upper()]
-                                                if element_to_add not in target_item.temporary_elements: target_item.temporary_elements.append(element_to_add)
-                                            except (KeyError, AttributeError): print(f"Warning: Invalid element '{effect_data['value']}' for ADD_ELEMENT_TO_TARGET in {source_item.name}")
+                                                if element_to_add not in target_item.temporary_elements: target_item.temporary_elements.append(
+                                                    element_to_add)
+                                            except (KeyError, AttributeError):
+                                                print(
+                                                    f"Warning: Invalid element '{effect_data['value']}' for ADD_ELEMENT_TO_TARGET in {source_item.name}")
                                         break
         for source_item in placed_items.values():
             gx, gy = source_item.gx, source_item.gy
@@ -225,7 +289,7 @@ class CalculationEngine:
                 for c, cell_type in enumerate(row):
                     if cell_type in triggered_by:
                         abs_x, abs_y = gx + c, gy + r
-                        if not(0 <= abs_x < backpack_cols and 0 <= abs_y < backpack_rows): continue
+                        if not (0 <= abs_x < backpack_cols and 0 <= abs_y < backpack_rows): continue
                         base_star_name = cell_type.name
                         for star_key in source_item.star_effects:
                             if star_key.startswith(base_star_name):
@@ -234,7 +298,8 @@ class CalculationEngine:
                                 target_item = occupancy_grid[abs_y][abs_x]
                                 for effect_data in effects:
                                     logic = effect_data.get("condition_logic", "AND")
-                                    if self._check_condition(effect_data.get("condition", {}), source_item, target_item, logic):
+                                    if self._check_condition(effect_data.get("condition", {}), source_item, target_item,
+                                                             logic):
                                         if target_item is None or target_item not in triggered_by.get(cell_type, set()):
                                             source_item.activated_stars[cell_type] += 1
                                             if target_item:
@@ -251,7 +316,9 @@ class CalculationEngine:
                     if self._check_condition(effect_data.get("condition", {}), source_item, target_item, logic):
                         value = self._get_effect_value(effect_data, source_item)
                         reason = f"Passive from {target_item.name}"
-                        all_effects.append({"source": source_item, "target": target_item, "effect": effect_data["effect"], "value": value, "reason": reason})
+                        all_effects.append(
+                            {"source": source_item, "target": target_item, "effect": effect_data["effect"],
+                             "value": value, "reason": reason})
 
             triggered_targets = {GridType.STAR_A: set(), GridType.STAR_B: set(), GridType.STAR_C: set()}
             gx, gy = source_item.gx, source_item.gy
@@ -259,7 +326,7 @@ class CalculationEngine:
                 for c, cell_type in enumerate(row):
                     if cell_type in triggered_targets:
                         abs_x, abs_y = gx + c, gy + r
-                        if not(0 <= abs_x < backpack_cols and 0 <= abs_y < backpack_rows): continue
+                        if not (0 <= abs_x < backpack_cols and 0 <= abs_y < backpack_rows): continue
                         target_item = occupancy_grid[abs_y][abs_x]
                         is_duplicate = False
                         if target_item is not None:
@@ -273,17 +340,20 @@ class CalculationEngine:
                                 if not isinstance(effects, list): effects = [effects]
                                 for effect_data in effects:
                                     logic = effect_data.get("condition_logic", "AND")
-                                    if self._check_condition(effect_data.get("condition", {}), source_item, target_item, logic):
+                                    if self._check_condition(effect_data.get("condition", {}), source_item, target_item,
+                                                             logic):
                                         if "effect" in effect_data:
                                             value = self._get_effect_value(effect_data, source_item)
                                             reason = f"Star {cell_type.name.split('_')[1]}"
-                                            all_effects.append({"source": source_item, "target": target_item, "effect": effect_data["effect"], "value": value, "reason": reason})
+                                            all_effects.append({"source": source_item, "target": target_item,
+                                                                "effect": effect_data["effect"], "value": value,
+                                                                "reason": reason})
                                         if target_item is not None:
                                             triggered_targets[cell_type].add(target_item)
                                         effect_applied_for_this_cell = True
                                         break
                                 if effect_applied_for_this_cell: break
-        
+
         for eff in all_effects:
             if eff["effect"] == "ADD_TO_NEUTRAL_POOL":
                 try:
@@ -291,7 +361,6 @@ class CalculationEngine:
                     reason_text = f"from {eff['source'].name}'s {eff['reason']}"
                     self.neutral_pool_total += numeric_value
                     self.neutral_pool_modifiers.append(f"+{numeric_value:.1f} ({reason_text})")
-                    # --- NEW: Record neutral pool contribution as a self-synergy ---
                     self.interaction_map.append((eff["source"].name, eff["source"].name))
                 except (ValueError, TypeError):
                     continue
@@ -310,8 +379,9 @@ class CalculationEngine:
                             eff["target"].final_score += numeric_value
                             eff["target"].score_modifiers.append(f"+{numeric_value:.1f} from {eff['source'].name}")
                             self.interaction_map.append((eff["source"].name, eff["target"].name))
-                    except (ValueError, TypeError): continue
-        
+                    except (ValueError, TypeError):
+                        continue
+
         for effect_type in ["MULTIPLY_SCORE_OF_SELF", "MULTIPLY_SCORE_OF_TARGET"]:
             for eff in all_effects:
                 if eff["effect"] == effect_type:
@@ -326,4 +396,5 @@ class CalculationEngine:
                             eff["target"].final_score *= numeric_value
                             eff["target"].score_modifiers.append(f"x{numeric_value:.2f} from {eff['source'].name}")
                             self.interaction_map.append((eff["source"].name, eff["target"].name))
-                    except (ValueError, TypeError): continue
+                    except (ValueError, TypeError):
+                        continue
